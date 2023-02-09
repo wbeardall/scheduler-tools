@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.docformatter]
+recursive = true
+in-place = true
+wrap-summaries = 82
+blank = true
+syntax = "google"
+
+[tool.pytest.ini_options]
+addopts = "--cov=schedtools"
+testpaths = [
+    "test",
+]
+
+[tool.black]
+line-length = 88
+target_version = ['py37', 'py38', 'py39', 'py310']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | submodules
+  )/
+  | versioneer.py
+)
+'''
+
+[tool.isort]
+profile = "black"
