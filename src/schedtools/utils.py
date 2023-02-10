@@ -1,3 +1,4 @@
+import datetime
 import os
 from getpass import getpass
 
@@ -10,7 +11,7 @@ def connect_to_host(host_alias, get_password=False, **kwargs):
         host_alias: Alias for host to connect to.
     """
     ssh = paramiko.SSHConfig()
-    user_config_file = os.path.expanduser("~/.ssh/config")
+    user_config_file = os.environ.get("SSH_CONFIG",os.path.expanduser("~/.ssh/config"))
     if os.path.exists(user_config_file):
         with open(user_config_file) as f:
             ssh.parse(f)
@@ -50,3 +51,8 @@ def walltime_to(walltime, period="h"):
         return s/60
     else:
         return s / 3600
+
+def log_timestamp(file, msg):
+    with open(file, "a") as f:
+        f.write(f"{msg} ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
+    

@@ -2,16 +2,19 @@ import argparse
 import atexit
 from functools import partial
 import os
+from time import sleep
 import warnings
 
 import daemon
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from schedtools.jobs import rerun_jobs
-from schedtools.utils import connect_to_host
+from schedtools.service import make_service
+from schedtools.utils import connect_to_host, log_timestamp
 
 EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
+SLEEP_MINS = 0.00001
 
 def rerun():
     parser = argparse.ArgumentParser()
@@ -25,6 +28,8 @@ def rerun():
         help="Password for host authentication.")
     parser.add_argument("-l","--log",type=str,default=os.path.expanduser("~/.rerun-logs"),
         help="Log file.")
+    parser.add_argument("-s","--service",action="store_true",
+        help="Register this program as a service rather than running it.")
     args = parser.parse_args()
     if (1 - (args.threshold / 100)) * EXPECTED_WALLTIME < SAFE_BUFFER * args.interval:
         threshold =  (1 - SAFE_BUFFER * args.interval / EXPECTED_WALLTIME) * 100
@@ -42,12 +47,24 @@ def rerun():
     if password is not None:
         kwargs["password"] = password
 
+    if args.service:
+        command = f"rerun {args.host} -t {threshold:.1f} -i {args.interval:.1f} -l {args.log}"
+        if kwargs.get("password"):
+            command += " -p " + kwargs["password"]
+        make_service("rerun", command, {"SSH_CONFIG":os.path.expanduser("~/.ssh/config")})
+        # Hand over to service, so we don't need to run the rest now.
+        return 
+
     scheduler = BackgroundScheduler()
+    log_timestamp(args.log, "Scheduler created.")
     scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,log=args.log,**kwargs), 'interval', hours=args.interval)
-    
+    log_timestamp(args.log, "Rerun task scheduled.")
     # Wrap in DaemonContext to prevent exit after logout
     with daemon.DaemonContext():
         scheduler.start()
         # Clean up upon script exit
         atexit.register(lambda: scheduler.shutdown())
+        while True:
+            # Long sleep to minimise overheads
+            sleep(SLEEP_MINS * 60)
 
