@@ -28,8 +28,6 @@ def rerun():
         help="Interval (in hours) at which to check for jobs to rerun.")
     parser.add_argument("-p","--password",type=str,default=None,
         help="Password for host authentication.")
-    parser.add_argument("-l","--log",type=str,default=os.path.expanduser("~/.rerun-logs"),
-        help="Log file.")
     parser.add_argument("-s","--service",action="store_true",
         help="Register this program as a service rather than running it.")
     args = parser.parse_args()
@@ -50,16 +48,19 @@ def rerun():
         kwargs["password"] = password
 
     if args.service:
-        command = f"{__file__} {args.host} -t {threshold:.1f} -i {args.interval:.1f} -l {args.log}"
+        command = f"{__file__} {args.host} -t {threshold:.1f} -i {args.interval:.1f}"
         if kwargs.get("password"):
             command += " -p " + kwargs["password"]
-        make_service("rerun", command, {"SSH_CONFIG":os.path.expanduser("~/.ssh/config")})
+        make_service("rerun", command, {
+            "SSH_CONFIG":os.path.expanduser("~/.ssh/config"),
+            "SCHEDTOOLS_USER":os.getlogin(),
+            })
         # Hand over to service, so we don't need to run the rest now.
         return 
 
     scheduler = BackgroundScheduler()
     loggers.current.info("Scheduler created.")
-    scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,log=args.log,**kwargs), 'interval', hours=args.interval)
+    scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,**kwargs), 'interval', hours=args.interval)
     loggers.current.info("Rerun task scheduled.")
     # Wrap in DaemonContext to prevent exit after logout
     with daemon.DaemonContext():

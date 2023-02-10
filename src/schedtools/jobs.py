@@ -49,14 +49,13 @@ def parse_job_percentage(data):
                 running_jobs[id_] = float(pc.replace("%", ""))
     return running_jobs
 
-def rerun_jobs(handler, threshold=95, log=False, **kwargs):
+def rerun_jobs(handler, threshold=95, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     
     kwargs are provided to pass e.g. passwords to the created handler instance 
     without needing them stored anywhere.
     """
-    if log:
-        loggers.current.info("Executing rerun")
+    loggers.current.info("Executing rerun")
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
     _, stats, _ = handler.execute("qstat -p")

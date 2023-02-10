@@ -16,7 +16,9 @@ def get_logger(name=None):
     if journald_active():
         handler = journald.JournalHandler()
     else:
-        handler = logging.FileHandler(os.path.expanduser("~/.{}.log".format(name)))
+        # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
+        user = os.environ.get("SCHEDTOOLS_USER",os.getlogin())
+        handler = logging.FileHandler("/home/{}/.{}.log".format(user, name))
     log = logging.getLogger(name)
     log.addHandler(handler)
     log.setLevel(logging.INFO)
