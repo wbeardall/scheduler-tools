@@ -1,7 +1,5 @@
 import os
 from getpass import getpass
-import re
-import time
 
 import paramiko
 

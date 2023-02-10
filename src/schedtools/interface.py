@@ -1,7 +1,9 @@
 import argparse
+import atexit
 from functools import partial
 import warnings
 
+import daemon
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from schedtools.jobs import rerun_jobs
@@ -39,5 +41,10 @@ def rerun():
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,**kwargs), 'interval', hours=args.interval)
-    scheduler.start()
+    
+    # Wrap in DaemonContext to prevent exit after logout
+    with daemon.DaemonContext():
+        scheduler.start()
+        # Clean up upon script exit
+        atexit.register(lambda: scheduler.shutdown())
 
