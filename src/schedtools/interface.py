@@ -1,6 +1,7 @@
 import argparse
 import atexit
 from functools import partial
+import os
 import warnings
 
 import daemon
@@ -22,6 +23,8 @@ def rerun():
         help="Interval (in hours) at which to check for jobs to rerun.")
     parser.add_argument("-p","--password",type=str,default=None,
         help="Password for host authentication.")
+    parser.add_argument("-l","--log",type=str,default=os.path.expanduser("~/.rerun-logs"),
+        help="Log file.")
     args = parser.parse_args()
     if (1 - (args.threshold / 100)) * EXPECTED_WALLTIME < SAFE_BUFFER * args.interval:
         threshold =  (1 - SAFE_BUFFER * args.interval / EXPECTED_WALLTIME) * 100
@@ -40,7 +43,7 @@ def rerun():
         kwargs["password"] = password
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,**kwargs), 'interval', hours=args.interval)
+    scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,log=args.log,**kwargs), 'interval', hours=args.interval)
     
     # Wrap in DaemonContext to prevent exit after logout
     with daemon.DaemonContext():

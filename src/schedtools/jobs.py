@@ -1,3 +1,4 @@
+import datetime
 import re
 
 from schedtools.shell_handler import ShellHandler
@@ -47,20 +48,27 @@ def parse_job_percentage(data):
                 running_jobs[id_] = float(pc.replace("%", ""))
     return running_jobs
 
-def rerun_jobs(handler, threshold=95, verbose=False, **kwargs):
+def rerun_jobs(handler, threshold=95, log=False, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     
     kwargs are provided to pass e.g. passwords to the created handler instance 
     without needing them stored anywhere.
     """
+    if log:
+        msg = "Rerun task running at {}".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        if isinstance(log,str):
+            with open(log, "a") as f:
+                f.write(msg+"\n")
+        else:
+            print(msg)
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
     _, stats, _ = handler.execute("qstat -p")
     running_jobs = parse_job_percentage()
-    if verbose:
-        print("Watchin jobs:")
-        for k,v in running_jobs.items():
-            print(f"{k}: {v:.1f}%")
+    # if verbose:
+    #     print("Watching jobs:")
+    #     for k,v in running_jobs.items():
+    #         print(f"{k}: {v:.1f}%")
     to_rerun = [k for k,v in running_jobs if v >= threshold]
     if len(to_rerun):
         handler.execute(f"qrerun {' '.join(to_rerun)}")
