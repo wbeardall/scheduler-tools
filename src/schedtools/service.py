@@ -6,7 +6,7 @@ def make_service(name, command, environment):
     if env_str:
         env_str = f"\n{env_str}"
     python = sys.executable
-    service_id = {name.lower().replace(' ', '-')}.service
+    service_id = name.lower().replace(' ', '-') + ".service"
     service_config = f"""[Unit]
 Description={name} Service
 
