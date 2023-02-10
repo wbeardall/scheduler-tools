@@ -48,7 +48,7 @@ def rerun():
         kwargs["password"] = password
 
     if args.service:
-        command = f"rerun {args.host} -t {threshold:.1f} -i {args.interval:.1f} -l {args.log}"
+        command = f"{__file__} {args.host} -t {threshold:.1f} -i {args.interval:.1f} -l {args.log}"
         if kwargs.get("password"):
             command += " -p " + kwargs["password"]
         make_service("rerun", command, {"SSH_CONFIG":os.path.expanduser("~/.ssh/config")})
@@ -68,3 +68,5 @@ def rerun():
             # Long sleep to minimise overheads
             sleep(SLEEP_MINS * 60)
 
+if __name__=="__main__":
+    rerun()
