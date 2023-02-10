@@ -25,7 +25,7 @@ def get_logger(name=None):
 class Loggers(dict, metaclass=Singleton):
     def __getitem__(self,key):
         if key in self:
-            return self[key]
+            return super().__getitem__(key)
         logger = get_logger(key)
         self[key] = logger
         return logger

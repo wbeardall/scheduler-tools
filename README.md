@@ -22,6 +22,15 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
 This program runs itself in a daemon context, and so is SIGHUP-safe, even when not run as a service.
 
+## Installation
+
+This package relies on [systemd-python](https://pypi.org/project/systemd-python/) to interact with `journald`. As such,
+there are a few non-Python dependencies. These can be installed by running
+
+```
+sudo apt-get install gcc pkg-config libsystemd-dev
+```
+
 ## Usage
 
 Recommended: Run the provided tools as services (with the `-s` flag), in a designated environment.
