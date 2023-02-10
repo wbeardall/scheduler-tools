@@ -64,11 +64,10 @@ def rerun_jobs(handler, threshold=95, log=False, **kwargs):
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
     _, stats, _ = handler.execute("qstat -p")
-    running_jobs = parse_job_percentage()
-    # if verbose:
-    #     print("Watching jobs:")
-    #     for k,v in running_jobs.items():
-    #         print(f"{k}: {v:.1f}%")
+    running_jobs = parse_job_percentage(stats)
+    
     to_rerun = [k for k,v in running_jobs if v >= threshold]
     if len(to_rerun):
         handler.execute(f"qrerun {' '.join(to_rerun)}")
+        for job in to_rerun:
+            log_timestamp(log,f"Rerunning job {job}")
