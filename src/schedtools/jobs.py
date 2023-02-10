@@ -1,8 +1,8 @@
 import datetime
 import re
 
+from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
-from schedtools.utils import log_timestamp
 
 def parse_jobs(data):
     if not isinstance(data, list):
@@ -56,11 +56,7 @@ def rerun_jobs(handler, threshold=95, log=False, **kwargs):
     without needing them stored anywhere.
     """
     if log:
-        msg = "Execute rerun"
-        if isinstance(log,str):
-            log_timestamp(log, msg)
-        else:
-            print(msg + " ({})".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        loggers.current.info("Executing rerun")
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
     _, stats, _ = handler.execute("qstat -p")
@@ -70,4 +66,4 @@ def rerun_jobs(handler, threshold=95, log=False, **kwargs):
     if len(to_rerun):
         handler.execute(f"qrerun {' '.join(to_rerun)}")
         for job in to_rerun:
-            log_timestamp(log,f"Rerunning job {job}")
+            loggers.current.info(f"Rerunning job {job}")

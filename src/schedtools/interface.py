@@ -9,14 +9,16 @@ import daemon
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from schedtools.jobs import rerun_jobs
+from schedtools.log import loggers
 from schedtools.service import make_service
-from schedtools.utils import connect_to_host, log_timestamp
+from schedtools.utils import connect_to_host
 
 EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
 SLEEP_MINS = 0.00001
 
 def rerun():
+    os.environ["SCHEDTOOLS_PROG"] = "rerun"
     parser = argparse.ArgumentParser()
     parser.add_argument("host",type=str,
         help="Host alias in `~/.ssh/config`.")
@@ -56,9 +58,9 @@ def rerun():
         return 
 
     scheduler = BackgroundScheduler()
-    log_timestamp(args.log, "Scheduler created.")
+    loggers.current.info("Scheduler created.")
     scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,log=args.log,**kwargs), 'interval', hours=args.interval)
-    log_timestamp(args.log, "Rerun task scheduled.")
+    loggers.current.info("Rerun task scheduled.")
     # Wrap in DaemonContext to prevent exit after logout
     with daemon.DaemonContext():
         scheduler.start()

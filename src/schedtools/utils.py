@@ -51,8 +51,16 @@ def walltime_to(walltime, period="h"):
         return s/60
     else:
         return s / 3600
-
-def log_timestamp(file, msg):
-    with open(file, "a") as f:
-        f.write(f"{msg} ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
     
+class Singleton(type):
+    """Singleton metaclass.
+
+    Only allows one instance of each class.
+    """
+
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
