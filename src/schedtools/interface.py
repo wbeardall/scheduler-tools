@@ -1,6 +1,5 @@
 import argparse
 import atexit
-from functools import partial
 import os
 from time import sleep
 import warnings
@@ -58,10 +57,12 @@ def rerun():
         # Hand over to service, so we don't need to run the rest now.
         return 
 
+    logger = loggers.current
     scheduler = BackgroundScheduler()
-    loggers.current.info("Scheduler created.")
-    scheduler.add_job(partial(rerun_jobs,handler=args.host,threshold=threshold,**kwargs), 'interval', hours=args.interval)
-    loggers.current.info("Rerun task scheduled.")
+    logger.info("Scheduler created.")
+    scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
+        kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
+    logger.info("Rerun task scheduled.")
     # Wrap in DaemonContext to prevent exit after logout
     with daemon.DaemonContext():
         scheduler.start()
