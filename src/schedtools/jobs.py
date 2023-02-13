@@ -28,15 +28,15 @@ def get_jobs(handler):
         elif " = " in line:
             indent = line.index(" ") - len(line.lstrip('\t'))
             if indent > current_indent:
-                current_job[current_key] += "\n" + line.strip()
+                current_job[current_key] += line.strip()
                 current_indent = indent
             else:
                 key, val = line.strip().split(" = ")
                 current_job[key] = val
                 current_key = key
                 current_indent = 0
-        else:
-            current_job[current_key] += "\n" + line.strip()
+        elif current_key:
+            current_job[current_key] += line.strip()
     jobs.append(current_job)
     return jobs
 
