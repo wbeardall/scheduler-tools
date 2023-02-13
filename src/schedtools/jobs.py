@@ -38,7 +38,7 @@ def parse_jobs(data):
 def parse_job_percentage(data):
     if not isinstance(data, list):
         data = data.split("\n")
-    assert tuple(data[0].strip().split())==('Job', 'id', 'Name', 'User', '%', 'done', 'S', 'Queue')
+    assert tuple(data[0].strip().split())==('Job', 'id', 'Name', 'User', '%', 'done', 'S', 'Queue'),data[0]
     running_jobs = {}
     for i in range(2, len(data)):
         line = data[i].strip().split()
@@ -63,7 +63,7 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
     _, stats, _ = handler.execute("qstat -p")
     running_jobs = parse_job_percentage(stats)
     
-    to_rerun = [k for k,v in running_jobs if v >= threshold]
+    to_rerun = [k for k,v in running_jobs.items() if v >= threshold]
     if len(to_rerun):
         handler.execute(f"qrerun {' '.join(to_rerun)}")
         for job in to_rerun:
