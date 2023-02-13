@@ -15,9 +15,6 @@ from schedtools.utils import connect_to_host
 EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
 
-def rerun_jobs_dummy(logger,*args,**kwargs):
-    logger.info("Executing rerun")
-
 def rerun():
     os.environ["SCHEDTOOLS_PROG"] = "rerun"
     parser = argparse.ArgumentParser()
