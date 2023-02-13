@@ -83,7 +83,7 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
         handler = ShellHandler(handler, **kwargs)
     jobs = get_jobs(handler)
     
-    priority_rerun = get_rerun_from_file()
+    priority_rerun = get_rerun_from_file(handler)
     priority_ids = [el["id"] for el in priority_rerun]
     new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job["id"] in priority_ids]
     to_rerun = [el for chunk in [priority_rerun, new_rerun] for el in chunk]
