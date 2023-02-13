@@ -88,29 +88,32 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
     new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job["id"] in priority_ids]
     to_rerun = [el for chunk in [priority_rerun, new_rerun] for el in chunk]
     for_future = []
-    logged_fail_qrerun = False
+    qrerun_auth_fail = False
     if len(to_rerun):
         for job in to_rerun:
-            result = handler.execute(f"qrerun {job.id}")
-            if result.returncode:
-                # Account not authorized for qrerun
-                if result.returncode==159:
-                    if not logged_fail_qrerun:
+            if not qrerun_auth_fail:
+                result = handler.execute(f"qrerun {job.id}")
+
+                if result.returncode:
+                    # Account not authorized for qrerun
+                    if result.returncode==159:
                         logger.info("User not authorized to use `qrerun`. Attempting to requeue from jobscript.")
-                        logged_fail_qrerun = True
-                    result = handler.execute(f"qsub {job.jobscript_path}")
-                    if result.returncode:
-                        logger.info(f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})")
-                        # Number of jobs exceeds user's limit
-                        if result.returncode==38:
-                            pass
-                        for_future.append(job)
+                        qrerun_auth_fail = True
                     else:
-                        logger.info(f"Rerunning job {job.id}")
+                        logger.info(f"Rerun failed with status {result.returncode} ({result.stderr[0].strip()}).")
                 else:
-                    logger.info(f"Rerun failed with status {result.returncode} ({result.stderr[0].strip()}).")
-            else:
-                logger.info(f"Rerunning job {job}")
+                    logger.info(f"Rerunning job {job.id}")
+            if qrerun_auth_fail:
+                result = handler.execute(f"qsub {job.jobscript_path}")
+                if result.returncode:
+                    logger.info(f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})")
+                    # Number of jobs exceeds user's limit
+                    if result.returncode==38:
+                        pass
+                    for_future.append(job)
+                else:
+                    logger.info(f"Rerunning job {job.id}")
+                
     if len(for_future):
         # Log any jobs that haven't been able to be requeued
         future_json = json.dumps({job.id:job.jobscript_path for job in for_future})
