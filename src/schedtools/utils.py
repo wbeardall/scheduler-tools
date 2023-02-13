@@ -1,6 +1,6 @@
-import datetime
 import os
 from getpass import getpass
+import subprocess
 
 import paramiko
 
@@ -51,6 +51,12 @@ def walltime_to(walltime, period="h"):
         return s/60
     else:
         return s / 3600
+
+def journald_active():
+    return not subprocess.run("systemctl is-active --quiet systemd-journald".split()).returncode
+
+def systemd_service():
+    return "SYSTEMD_SERVICE" in os.environ
     
 class Singleton(type):
     """Singleton metaclass.

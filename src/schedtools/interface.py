@@ -10,7 +10,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from schedtools.jobs import rerun_jobs
 from schedtools.log import loggers
 from schedtools.service import make_service
-from schedtools.utils import connect_to_host
+from schedtools.utils import connect_to_host, systemd_service
 
 EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
@@ -52,21 +52,29 @@ def rerun():
         make_service("rerun", command, {
             "SSH_CONFIG":os.path.expanduser("~/.ssh/config"),
             "SCHEDTOOLS_USER":os.environ["LOGNAME"],
+            "SYSTEMD_SERVICE":"True"
             })
         # Hand over to service, so we don't need to run the rest now.
         return 
 
     logger = loggers.current
     scheduler = BlockingScheduler()
-    logger.info("Scheduler created.")
-    scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
-        kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
-    logger.info("Rerun task scheduled.")
-    # Wrap in DaemonContext to prevent exit after logout
-    with daemon.DaemonContext(files_preserve=[handler.stream for handler in logger.handlers if hasattr(handler,"stream")]):
-        # Clean up upon script exit
-        atexit.register(lambda: scheduler.shutdown())
-        scheduler.start()
+    
+    # Only daemonize if not being run by systemd.
+    if systemd_service():
+        while True:
+            rerun_jobs(handler=args.host,threshold=threshold,logger=logger,**kwargs)
+            time.sleep(args.interval*3600)
+    else:
+        logger.info("Scheduler created.")
+        scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
+            kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
+        logger.info("Rerun task scheduled.")
+        # Wrap in DaemonContext to prevent exit after logout
+        with daemon.DaemonContext(files_preserve=[handler.stream for handler in logger.handlers if hasattr(handler,"stream")]):
+            # Clean up upon script exit
+            atexit.register(lambda: scheduler.shutdown())
+            scheduler.start()
 
 if __name__=="__main__":
     rerun()

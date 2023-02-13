@@ -4,10 +4,8 @@ import subprocess
 
 import systemd.journal as journald
 
-from schedtools.utils import Singleton
+from schedtools.utils import Singleton, journald_active, systemd_service
 
-def journald_active():
-    return not subprocess.run("systemctl is-active --quiet systemd-journald".split()).returncode
 
 def get_logger(name=None):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable."""
@@ -16,9 +14,10 @@ def get_logger(name=None):
     # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
     user = os.environ.get("SCHEDTOOLS_USER",os.environ["LOGNAME"])
     handlers = []
-    handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
-    if journald_active():
+    if journald_active() and systemd_service():
         handlers.append(journald.JournalHandler())
+    else:
+        handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
     
     log = logging.getLogger(name)
     for handler in handlers:
