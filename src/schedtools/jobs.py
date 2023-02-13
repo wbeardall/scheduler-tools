@@ -57,7 +57,7 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
     """
     if logger is None:
         logger = loggers.current
-    logger.info("Executing rerun")
+    logger.info("Executing rerun.")
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
     _, stats, _ = handler.execute("qstat -p")
