@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import atexit
 import os
 import warnings
@@ -68,6 +69,7 @@ def rerun():
     else:
         logger.info("Scheduler created.")
         scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
+            next_run_time=datetime.datetime.now(),
             kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
         logger.info("Rerun task scheduled.")
         # Wrap in DaemonContext to prevent exit after logout

@@ -1,8 +1,11 @@
+from collections import namedtuple
+
 import paramiko
 import re
 
 from schedtools.utils import connect_to_host
 
+SSHResult = namedtuple("SSHResult","stdin stdout stderr returncode")
 
 class ShellHandler:
 
@@ -67,4 +70,4 @@ class ShellHandler:
         if sherr and cmd in sherr[0]:
             sherr.pop(0)
 
-        return shin, shout, sherr
+        return SSHResult(shin, shout, sherr, exit_status)
