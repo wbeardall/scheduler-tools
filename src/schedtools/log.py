@@ -13,14 +13,16 @@ def get_logger(name=None):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable."""
     if name is None:
         name = os.environ["SCHEDTOOLS_PROG"]
+    # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
+    user = os.environ.get("SCHEDTOOLS_USER",os.environ["LOGNAME"])
+    handlers = []
+    handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
     if journald_active():
-        handler = journald.JournalHandler()
-    else:
-        # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
-        user = os.environ.get("SCHEDTOOLS_USER",os.getlogin())
-        handler = logging.FileHandler("/home/{}/.{}.log".format(user, name))
+        handlers.append(journald.JournalHandler())
+    
     log = logging.getLogger(name)
-    log.addHandler(handler)
+    for handler in handlers:
+        log.addHandler(handler)
     log.setLevel(logging.INFO)
     return log
 

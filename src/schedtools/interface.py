@@ -1,11 +1,11 @@
 import argparse
 import atexit
 import os
-from time import sleep
 import warnings
+import time
 
 import daemon
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 from schedtools.jobs import rerun_jobs
 from schedtools.log import loggers
@@ -14,7 +14,9 @@ from schedtools.utils import connect_to_host
 
 EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
-SLEEP_MINS = 0.00001
+
+def rerun_jobs_dummy(logger,*args,**kwargs):
+    logger.info("Executing rerun")
 
 def rerun():
     os.environ["SCHEDTOOLS_PROG"] = "rerun"
@@ -52,25 +54,22 @@ def rerun():
             command += " -p " + kwargs["password"]
         make_service("rerun", command, {
             "SSH_CONFIG":os.path.expanduser("~/.ssh/config"),
-            "SCHEDTOOLS_USER":os.getlogin(),
+            "SCHEDTOOLS_USER":os.environ["LOGNAME"],
             })
         # Hand over to service, so we don't need to run the rest now.
         return 
 
     logger = loggers.current
-    scheduler = BackgroundScheduler()
+    scheduler = BlockingScheduler()
     logger.info("Scheduler created.")
     scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
         kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
     logger.info("Rerun task scheduled.")
     # Wrap in DaemonContext to prevent exit after logout
-    with daemon.DaemonContext():
-        scheduler.start()
+    with daemon.DaemonContext(files_preserve=[handler.stream for handler in logger.handlers if hasattr(handler,"stream")]):
         # Clean up upon script exit
         atexit.register(lambda: scheduler.shutdown())
-        while True:
-            # Long sleep to minimise overheads
-            sleep(SLEEP_MINS * 60)
+        scheduler.start()
 
 if __name__=="__main__":
     rerun()
