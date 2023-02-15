@@ -1,6 +1,6 @@
 # Scheduler Tools
 
-![Tests](https://github.com/wbeardall/scheduler-tools/actions/workflows/tox.yml/badge.svg) ![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
+![Tests](https://github.com/wbeardall/scheduler-tools/actions/workflows/tox.yml/badge.svg) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgray) ![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 
 Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided 
 programs with the `-s` flag will turn them into services. This requires `sudo` privileges, so don't run these unless
