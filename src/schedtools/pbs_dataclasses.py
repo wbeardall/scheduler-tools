@@ -7,11 +7,11 @@ class PBSJob(dict):
     these are non-Pythonic.
     """
     # TODO: Make into a proper dataclass if needed.
-    def __getattr__(self,key):
+    def __getattr__(self, key, *args, **kwargs):
         try:
-            return super().__getattr__(key)
+            return super().__getattr__(key, *args, **kwargs)
         except AttributeError:
-            return self.__getitem__(key)
+            return self.__getitem__(key, *args, **kwargs)
 
     @property
     def id(self):
@@ -24,6 +24,6 @@ class PBSJob(dict):
 
     @property
     def percent_completion(self):
-        if hasattr(self, "resources_used.walltime"):
+        if "resources_used.walltime" in self:
             return 100 * walltime_to(self["resources_used.walltime"]) / walltime_to(self["Resource_List.walltime"]) 
         return 0

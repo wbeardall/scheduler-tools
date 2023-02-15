@@ -138,6 +138,7 @@ def test_get_jobs():
             assert job[k] == v
         # Test attribute-style field access
         assert job.project == "_pbs_project_default"
+        assert job.percent_completion == 0
 
 def test_rerun_from_file():
     handler = DummyHandler()
