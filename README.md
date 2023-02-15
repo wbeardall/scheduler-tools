@@ -2,6 +2,9 @@
 
 ![Tests](https://github.com/wbeardall/scheduler-tools/actions/workflows/tox.yml/badge.svg) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgray) ![Python](https://img.shields.io/badge/python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 
+
+---
+
 Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided 
 programs with the `-s` flag will turn them into services. This requires `sudo` privileges, so don't run these unless
 you trust that I'm not doing anything nasty to your box!
@@ -22,9 +25,9 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 ### Rerun
 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
-This program runs itself in a daemon context if not running as a service, and so is SIGHUP-safe.
+This program runs itself in a daemon context if not running as a service, and so is `SIGHUP`-safe.
 
-## Usage
+#### Usage
 
 If you have manager-level privileges on the cluster, usage is straightforward, as the program can simply call the `qrerun`
 command with the IDs of any jobs that are at risk of timing out. 
