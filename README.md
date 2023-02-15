@@ -130,3 +130,24 @@ until you reboot the machine. You can check that the program is running properly
 ```
 ps aux | grep schedtools
 ```
+
+### Running Programs as Services
+
+Programs (e.g. the `rerun` utility) can be run in service mode as follows:
+
+```
+rerun my-cluster -s
+```
+
+This will register the program as a service with `systemd`. This ensures that the program is relaunched upon reboot.
+You can check that the service is running properly by calling
+
+```
+systemctl status rerun.service
+```
+
+If your machine uses `journald` (likely), then logs can be accessed by calling
+
+```
+journalctl -u rerun.service
+```
