@@ -46,9 +46,9 @@ there are a few non-Python dependencies. These can be installed by running
 sudo apt-get install gcc pkg-config libsystemd-dev
 ```
 
-## Usage
-
-Recommended: Run the provided tools as services (with the `-s` flag), in a designated environment.
+We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode. 
+This minimises the probability that changes to the environment breaks the service in a way that might not be noticed 
+for a while (in case you don't check your logs frequently!).
 
 ```
 conda create -n schedtools python=3.8
@@ -56,5 +56,77 @@ conda activate schedtools
 pip install -e .
 ```
 
+
+## Usage
+
+Recommended: Run the provided tools as services (with the `-s` flag), in a dedicated environment.
+
 This should allow the service to access the correct Python installation upon repeated reboots, and ensures that
 the environment is stable.
+
+### Before You Start
+
+`schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`). 
+We *highly* recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
+authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and 
+prevent `schedtools` from needing to store them itself.
+
+Ensure that you've added *at least* the following information to your SSH config for the cluster you're interfacing with:
+
+```
+Host my-cluster
+  HostName my-cluster-address.com
+  User cluster-username
+```
+
+### Setting Up Key-Based Authentication
+
+If your cluster allows, it we recommend using key-based authentication to allow `schedtools` programs SSH access.
+
+**Note**: The login servers at the Imperial College RCS don't appear to allow key-based authentication, even though debug logs
+list `publickey` as a valid authentication method. I'm currently waiting on ICT to provide a workaround.
+
+1. Generate a key pair on your local machine with `ssh-keygen`
+
+```
+ssh-keygen -f $HOME/.ssh/cluster_rsa
+```
+
+2. Copy the public key to the cluster with `ssh-copy-id`
+
+If you've already added the cluster to your `$HOME/.ssh/config`, you can simply run
+
+```
+ssh-copy-id -i $HOME/.ssh/cluster_rsa my-cluster
+```
+
+Otherwise, provide the full address:
+
+```
+ssh-copy-id -i $HOME/.ssh/cluster_rsa user@host
+```
+
+3. Add the key to your `$HOME/.ssh/config`. The updated config entry should look like this:
+
+```
+Host my-cluster
+  HostName my-cluster-address.com
+  User cluster-username
+  IdentityFile ~/.ssh/cluster_rsa
+```
+
+### Running Programs as Daemons
+
+If you've done the above correctly, you should be able to run (e.g. the `rerun` utility) in daemon mode
+as follows:
+
+```
+rerun my-cluster
+```
+
+The program will daemonize itself, so it is safe to log out of your session, and the program will continue running
+until you reboot the machine. You can check that the program is running properly by calling
+
+```
+ps aux | grep schedtools
+```
