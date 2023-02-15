@@ -8,6 +8,11 @@ from schedtools.shell_handler import ShellHandler
 PRIORITY_RERUN_FILE = "$HOME/.priority-rerun"
 
 def get_jobs(handler):
+    """Get full job information on all running / queued jobs
+    
+    Args:
+        handler: `ShellHandler` instance to use to query cluster
+    """
     result = handler.execute("qstat -f")
     if result.returncode:
         raise RuntimeError(f"qstat failed with returncode {result.returncode}")
@@ -42,6 +47,14 @@ def get_jobs(handler):
 
 
 def get_job_percentage(handler):
+    """Get percentage completion of current running / queued jobs.
+    
+    Queries the cluster using `qstat -p`, and so does not return full job information.
+    Jobs are returned as a dict of job_id: percentage pairs
+
+    Args:
+        handler: `ShellHandler` instance to use to query cluster
+    """
     result = handler.execute("qstat -p")
     if result.returncode:
         raise RuntimeError(f"qstat failed with returncode {result.returncode}")
@@ -63,6 +76,13 @@ def get_job_percentage(handler):
     return running_jobs
 
 def get_rerun_from_file(handler):
+    f"""Get priority rerun jobs from a cached rerun queue file on the cluster.
+
+    Expects any priority jobs to be stored in `{PRIORITY_RERUN_FILE}` (json-formatted)
+    
+    Args:
+        handler: `ShellHandler` instance to use to query cluster
+    """
     result = handler.execute(f"cat {PRIORITY_RERUN_FILE}")
     if result.returncode:
         return []
@@ -101,6 +121,7 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
                         qrerun_auth_fail = True
                     else:
                         logger.info(f"Rerun failed with status {result.returncode} ({result.stderr[0].strip()}).")
+                        for_future.append(job)
                 else:
                     logger.info(f"Rerunning job {job.id}")
             if qrerun_auth_fail:

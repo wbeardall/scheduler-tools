@@ -1,7 +1,17 @@
 from schedtools.utils import walltime_to
 
 class PBSJob(dict):
+    """Simple dict-like interface for storing PBS job information.
+    
+    Follows field name conventions of `qstat -f` for simplicity, even though
+    these are non-Pythonic.
+    """
     # TODO: Make into a proper dataclass if needed.
+    def __getattr__(self,key):
+        try:
+            return super().__getattr__(key)
+        except AttributeError:
+            return self.__getitem__(key)
 
     @property
     def id(self):
