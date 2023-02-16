@@ -1,6 +1,5 @@
 import logging
 import os
-import subprocess
 
 import systemd.journal as journald
 

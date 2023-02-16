@@ -39,6 +39,8 @@ def rerun():
 
     if args.password:
         kwargs = {"password":args.password}
+    elif "CLUSTER_SSH_PASSWORD" in os.environ:
+        kwargs = {"password":os.environ["CLUSTER_SSH_PASSWORD"]}
     else:
         kwargs = {}
 
@@ -48,13 +50,14 @@ def rerun():
 
     if args.service:
         command = f"{__file__} {args.host} -t {threshold:.1f} -i {args.interval:.1f}"
-        if kwargs.get("password"):
-            command += " -p " + kwargs["password"]
-        make_service("rerun", command, {
+        env_vars = {
             "SSH_CONFIG":os.path.expanduser("~/.ssh/config"),
             "SCHEDTOOLS_USER":os.environ["LOGNAME"],
             "SYSTEMD_SERVICE":"True"
-            })
+            }
+        if kwargs.get("password"):
+            env_vars["CLUSTER_SSH_PASSWORD"] = kwargs["password"]
+        make_service("rerun", command, env_vars)
         # Hand over to service, so we don't need to run the rest now.
         return 
 

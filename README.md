@@ -72,9 +72,10 @@ the environment is stable.
 ### Before You Start
 
 `schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`). 
-We *highly* recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
+We recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
 authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and 
-prevent `schedtools` from needing to store them itself.
+prevent `schedtools` from needing to store credentials itself. However, `schedtools` does have to store the password,
+it is stored in a config file to which only `root` has access, so it is as secure as storing SSH keys locally.
 
 Ensure that you've added *at least* the following information to your SSH config for the cluster you're interfacing with:
 
@@ -88,8 +89,9 @@ Host my-cluster
 
 If your cluster allows, it we recommend using key-based authentication to allow `schedtools` programs SSH access.
 
-**Note**: The login servers at the Imperial College RCS don't appear to allow key-based authentication, even though debug logs
-list `publickey` as a valid authentication method. I'm currently waiting on ICT to provide a workaround.
+**Note**: The login servers at the Imperial College RCS don't allow key-based authentication. If you're using `schedtools`
+with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether 
+your cluster supports key-based authentication.
 
 1. Generate a key pair on your local machine with `ssh-keygen`
 
