@@ -27,7 +27,8 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 ### `rerun`
 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
-This program runs itself in a daemon context if not running as a service, and so is `SIGHUP`-safe.
+This program runs itself in a daemon context (see [Running Programs as Daemons](#running-programs-as-daemons)) 
+if not running as a service, and so is `SIGHUP`-safe.
 
 #### Usage
 
