@@ -6,7 +6,7 @@
 ---
 
 Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided 
-programs with the `-s` flag will register them as services with `systemd` (see [Running Programs as Services](#progs-as-services)). 
+programs with the `-s` flag will register them as services with `systemd` (see [Running Programs as Services](#running-programs-as-services)). 
 Registering a new service requires elevated privileges, so naturally you can't use programs in this way if you don't have
 root access to the machine you're using. Additionally, never run any untrusted program with elevated privileges, so don't use
 these programs in service mode unless you trust that I'm not doing anything nasty to your box!
@@ -15,7 +15,7 @@ Running provided programs with the `-s` flag will register them with `systemd`, 
 restarted upon reboot. This essentially fully automates the program on the server, so you don't have to worry about 
 it again unless your box catches fire (or if you do one of the following things):
 
-1. Remove or move the environment `schedtools` is installed in (see [Usage](#usage))
+1. Remove or move the environment `schedtools` is installed in (see [Package Usage](#package-usage))
 2. Move or remove the `scheduler-tools` directory
 3. Move or remove your `~/.ssh/config`
 4. Change the password or other credentials on the cluster
@@ -84,7 +84,7 @@ For detailed information on the CLI for the `convert-jobscripts` utility, run th
 convert-jobscripts -h
 ```
 
-## <a href="usage"></a>Usage
+## Package Usage
 
 Recommended: Run the provided tools as services (with the `-s` flag), in a dedicated environment.
 
@@ -163,7 +163,7 @@ until you reboot the machine. You can check that the program is running properly
 ps aux | grep schedtools
 ```
 
-### <a href="progs-as-services"></a>Running Programs as Services
+### Running Programs as Services
 
 Programs (e.g. the `rerun` utility) can be run in service mode as follows:
 
