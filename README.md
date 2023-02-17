@@ -113,7 +113,7 @@ to increase security. `schedtools` is not designed to handle the TOTP side of au
 
 ### Setting Up Key-Based Authentication
 
-If your cluster allows, it we recommend using key-based authentication to allow `schedtools` programs SSH access.
+If your cluster allows it, we recommend using key-based authentication to allow `schedtools` programs SSH access.
 
 **Note**: The login servers at the Imperial College RCS don't allow key-based authentication. If you're using `schedtools`
 with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether 
