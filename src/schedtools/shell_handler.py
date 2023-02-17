@@ -18,7 +18,10 @@ class ShellHandler:
         self.stdout = channel.makefile('r')
 
     def __del__(self):
-        self.ssh.close()
+        try:
+            self.ssh.close()
+        except:
+            pass
     
     def close(self):
         self.ssh.close()

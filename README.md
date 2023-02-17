@@ -85,6 +85,9 @@ Host my-cluster
   User cluster-username
 ```
 
+Note that certain clusters, such as [SULIS](https://sulis-hpc.github.io/) use TOTP (Time-based One Time Password) authentication
+to increase security. `schedtools` is not designed to handle the TOTP side of authentication, so you must manage this yourself.
+
 ### Setting Up Key-Based Authentication
 
 If your cluster allows, it we recommend using key-based authentication to allow `schedtools` programs SSH access.

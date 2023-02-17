@@ -1,6 +1,7 @@
 from schedtools.pbs_dataclasses import PBSJob
-from schedtools.jobs import PRIORITY_RERUN_FILE, get_jobs, get_rerun_from_file
-from schedtools.shell_handler import SSHResult
+from schedtools.jobs import PRIORITY_RERUN_FILE, get_rerun_from_file
+from schedtools.managers import PBS
+from schedtools.shell_handler import ShellHandler, SSHResult
 
 qstat_raw_example = """a bunch of junk data at the top
 of the file
@@ -111,9 +112,10 @@ Job Id: 7013475.pbs
     project = _pbs_project_default
 """
 
-class DummyHandler(object):
-    def __init__(self,*args, **kwargs):
+class DummyHandler(ShellHandler):
+    def __init__(self,allow = [], fail = []):
         pass
+
     def execute(self,command):
         if command == "qstat -f":
             return SSHResult([], qstat_raw_example.split("\n"),[],0)
@@ -125,7 +127,7 @@ class DummyHandler(object):
 
 def test_get_jobs():
     handler = DummyHandler()
-    jobs = get_jobs(handler)
+    jobs = PBS.get_jobs_from_handler(handler)
     attrs = [
         {"id":"7013474",
         "Job_Name": "job-01.pbs"},

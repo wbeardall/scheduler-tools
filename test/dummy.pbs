@@ -1,0 +1,6 @@
+#!/bin/sh
+# Set job allocation parameters
+#PBS -l walltime=72:00:00
+#PBS -l select=1:ncpus=4:mem=15400mb:ngpus=1:gpu_type=RTX6000
+
+module purge

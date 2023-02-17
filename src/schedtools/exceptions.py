@@ -1,0 +1,2 @@
+class JobSubmissionError(RuntimeError):
+    pass

@@ -1,50 +1,12 @@
 import json
-import re
 
+from schedtools.exceptions import JobSubmissionError
 from schedtools.log import loggers
+from schedtools.managers import get_workload_manager
 from schedtools.pbs_dataclasses import PBSJob
 from schedtools.shell_handler import ShellHandler
 
 PRIORITY_RERUN_FILE = "$HOME/.priority-rerun"
-
-def get_jobs(handler):
-    """Get full job information on all running / queued jobs
-    
-    Args:
-        handler: `ShellHandler` instance to use to query cluster
-    """
-    result = handler.execute("qstat -f")
-    if result.returncode:
-        raise RuntimeError(f"qstat failed with returncode {result.returncode}")
-    data = result.stdout
-    jobs = []
-    current_job = PBSJob()
-    current_key = ""
-    current_indent = 0
-    for line in data:
-        if not len(line.strip()):
-            continue
-        if line.startswith("Job Id: "):
-            if current_job:
-                jobs.append(current_job)
-            current_job = PBSJob({"id": re.findall("(?<=Job Id: )[0-9]+", line.strip())[0]})
-            current_key = ""
-            current_indent = 0
-        elif " = " in line:
-            indent = line.index(" ") - len(line.lstrip('\t'))
-            if indent > current_indent:
-                current_job[current_key] += line.strip()
-                current_indent = indent
-            else:
-                key, val = line.strip().split(" = ")
-                current_job[key] = val
-                current_key = key
-                current_indent = 0
-        elif current_key:
-            current_job[current_key] += line.strip()
-    jobs.append(current_job)
-    return jobs
-
 
 def get_job_percentage(handler):
     """Get percentage completion of current running / queued jobs.
@@ -101,39 +63,21 @@ def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
     logger.info("Executing rerun.")
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler, **kwargs)
-    jobs = get_jobs(handler)
+
+    manager = get_workload_manager(handler, logger)
+    jobs = manager.get_jobs()
     
     priority_rerun = get_rerun_from_file(handler)
     priority_ids = [el["id"] for el in priority_rerun]
     new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job["id"] in priority_ids]
     to_rerun = [el for chunk in [priority_rerun, new_rerun] for el in chunk]
     for_future = []
-    qrerun_auth_fail = False
     if len(to_rerun):
         for job in to_rerun:
-            if not qrerun_auth_fail:
-                result = handler.execute(f"qrerun {job.id}")
-
-                if result.returncode:
-                    # Account not authorized for qrerun
-                    if result.returncode==159:
-                        logger.info("User not authorized to use `qrerun`. Attempting to requeue from jobscript.")
-                        qrerun_auth_fail = True
-                    else:
-                        logger.info(f"Rerun failed with status {result.returncode} ({result.stderr[0].strip()}).")
-                        for_future.append(job)
-                else:
-                    logger.info(f"Rerunning job {job.id}")
-            if qrerun_auth_fail:
-                result = handler.execute(f"qsub {job.jobscript_path}")
-                if result.returncode:
-                    logger.info(f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})")
-                    # Number of jobs exceeds user's limit
-                    if result.returncode==38:
-                        pass
-                    for_future.append(job)
-                else:
-                    logger.info(f"Rerunning job {job.id}")
+            try: 
+                manager.rerun_job(job)
+            except JobSubmissionError:
+                for_future.append(job)
                 
     if len(for_future):
         # Log any jobs that haven't been able to be requeued

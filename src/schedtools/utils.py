@@ -1,5 +1,6 @@
 import os
 from getpass import getpass
+import re
 import subprocess
 
 import paramiko
@@ -53,6 +54,21 @@ def walltime_to(walltime, period="h"):
     else:
         return s / 3600
 
+def memory_to(memory, scale="MB"):
+    scale_map = {
+        "gb":1000,
+        "mb":1,
+        "":1
+    }
+    pattern = r"(\d+)([A-Za-z]{0,2})"
+    match = re.match(pattern, memory)
+    if match:
+        numeric_part = match.group(1)
+        alpha_part = match.group(2)
+        return int(numeric_part)*scale_map[alpha_part.lower()] / scale_map[scale.lower()]
+    else:
+        raise ValueError(f"Unrecognized memory format: {memory}")
+
 def journald_active():
     return not subprocess.run("systemctl is-active --quiet systemd-journald".split()).returncode
 
@@ -71,3 +87,8 @@ class Singleton(type):
         if cls not in cls._instances:
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
+
+class RevDict(dict):
+    @property
+    def rev(self):
+        return RevDict({v:k for k,v in self.items()})
