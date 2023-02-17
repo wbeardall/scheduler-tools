@@ -97,7 +97,7 @@ the environment is stable.
 `schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`). 
 We recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
 authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and 
-prevent `schedtools` from needing to store credentials itself. However, `schedtools` does have to store the password,
+prevent `schedtools` from needing to store credentials itself. However, if `schedtools` does have to store the password,
 it is stored in a config file to which only `root` has access, so it is as secure as storing SSH keys locally.
 
 Ensure that you've added *at least* the following information to your SSH config for the cluster you're interfacing with:
