@@ -29,6 +29,8 @@ This program runs itself in a daemon context if not running as a service, and so
 
 #### Usage
 
+For detailed information on the CLI for the `rerun` utility, run the following command:
+
 ```
 rerun -h
 ```
@@ -73,6 +75,8 @@ Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa.
 `-s` flag. 
 
 #### Usage
+
+For detailed information on the CLI for the `convert-jobscripts` utility, run the following command:
 
 ```
 convert-jobscripts -h

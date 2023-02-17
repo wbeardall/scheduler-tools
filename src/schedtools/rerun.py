@@ -17,8 +17,9 @@ EXPECTED_WALLTIME = 72
 SAFE_BUFFER = 1.5
 
 def rerun():
+    """Utility for automatically rerunning jobs on clusters when they are in danger of timing out."""
     os.environ["SCHEDTOOLS_PROG"] = "rerun"
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=rerun.__doc__)
     parser.add_argument("host",type=str,
         help="Host alias in `~/.ssh/config`.")
     parser.add_argument("-t","--threshold",type=float,default=90,

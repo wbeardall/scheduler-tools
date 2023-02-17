@@ -1,4 +1,5 @@
 from collections import namedtuple
+from typing import Union
 
 import paramiko
 import re
@@ -9,7 +10,7 @@ SSHResult = namedtuple("SSHResult","stdin stdout stderr returncode")
 
 class ShellHandler:
 
-    def __init__(self, ssh, **kwargs):
+    def __init__(self, ssh: Union[paramiko.SSHClient, str], **kwargs):
         if not isinstance(ssh, paramiko.SSHClient):
             ssh = connect_to_host(ssh, **kwargs)
         self.ssh = ssh
@@ -26,7 +27,7 @@ class ShellHandler:
     def close(self):
         self.ssh.close()
 
-    def execute(self, cmd):
+    def execute(self, cmd: str):
         """
 
         :param cmd: the command to be executed on the remote computer

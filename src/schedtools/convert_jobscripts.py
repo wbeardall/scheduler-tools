@@ -16,7 +16,8 @@ def conversion_helper(path,recursive, to, updates = {}):
             conversion_helper(os.path.join(path,file), recursive=recursive, to=to)
 
 def convert_jobscripts():
-    parser = argparse.ArgumentParser()
+    """Convert jobscripts from PBS format to SLURM format and vice versa."""
+    parser = argparse.ArgumentParser(description=convert_jobscripts.__doc__)
     parser.add_argument("format",type=str,
         choices=["pbs", "slurm"],
         help="Format to convert jobscripts to.")
