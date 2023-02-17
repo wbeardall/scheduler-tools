@@ -6,8 +6,10 @@
 ---
 
 Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided 
-programs with the `-s` flag will turn them into services. This requires `sudo` privileges, so don't run these unless
-you trust that I'm not doing anything nasty to your box!
+programs with the `-s` flag will register them as services with `systemd` (see [Running Programs as Services](#progs-as-services)). 
+Registering a new service requires elevated privileges, so naturally you can't use programs in this way if you don't have
+root access to the machine you're using. Additionally, never run any untrusted program with elevated privileges, so don't use
+these programs in service mode unless you trust that I'm not doing anything nasty to your box!
 
 Running provided programs with the `-s` flag will register them with `systemd`, allowing them to be automatically 
 restarted upon reboot. This essentially fully automates the program on the server, so you don't have to worry about 
@@ -161,7 +163,7 @@ until you reboot the machine. You can check that the program is running properly
 ps aux | grep schedtools
 ```
 
-### Running Programs as Services
+### <a href="progs-as-services"></a>Running Programs as Services
 
 Programs (e.g. the `rerun` utility) can be run in service mode as follows:
 
