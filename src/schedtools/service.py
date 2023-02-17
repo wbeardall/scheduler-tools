@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-def make_service(name, command, environment):
+def make_service(name: str, command: str, environment: dict = {}):
     if len(environment):
         env_str = "\n".join([f'{k}="{v}"' for k,v in environment.items()]) + "\n"
         pass_env = "PassEnvironment=" + " ".join(environment) + "\n"

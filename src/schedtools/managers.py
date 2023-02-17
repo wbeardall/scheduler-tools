@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod, abstractstaticmethod
 from logging import Logger
 import re
+from typing import Union
 
 from schedtools.pbs_dataclasses import PBSJob
 from schedtools.exceptions import JobSubmissionError
@@ -9,7 +10,7 @@ from schedtools.shell_handler import ShellHandler
 
 class WorkloadManager(ABC):
     manager_check_cmd = None
-    def __init__(self, handler: ShellHandler, logger: Logger = None) -> None:
+    def __init__(self, handler: Union[ShellHandler, str], logger: Union[Logger, None] = None) -> None:
         if not isinstance(handler, ShellHandler):
             handler = ShellHandler(handler)
         if logger is None:
@@ -18,7 +19,7 @@ class WorkloadManager(ABC):
         self.logger = logger
     
     @classmethod
-    def is_valid(cls,handler):
+    def is_valid(cls,handler: ShellHandler):
         result = handler.execute(cls.manager_check_cmd)
         if result.returncode == 0:
             return True
@@ -32,15 +33,15 @@ class WorkloadManager(ABC):
         return self.get_jobs_from_handler(self.handler)
 
     @abstractstaticmethod
-    def get_jobs_from_handler(handler):
+    def get_jobs_from_handler(handler: ShellHandler):
         ...
 
     @abstractmethod
-    def submit_job(self, jobscript):
+    def submit_job(self, jobscript: str):
         ...
 
     @abstractmethod
-    def rerun_job(self, job):
+    def rerun_job(self, job: PBSJob):
         ...
 
 class PBS(WorkloadManager):
@@ -48,7 +49,7 @@ class PBS(WorkloadManager):
     qrerun_allowed = True
 
     @staticmethod
-    def get_jobs_from_handler(handler):
+    def get_jobs_from_handler(handler: ShellHandler):
         """Get full job information on all running / queued jobs"""
         result = handler.execute("qstat -f")
         if result.returncode:
@@ -82,10 +83,10 @@ class PBS(WorkloadManager):
         jobs.append(current_job)
         return jobs
 
-    def submit_job(self, jobscript_path):
+    def submit_job(self, jobscript_path: str):
         return self.handler.execute(f"qsub {jobscript_path}")
 
-    def rerun_job(self, job):
+    def rerun_job(self, job: PBSJob):
         if self.qrerun_allowed:
             result = self.handler.execute(f"qrerun {job.id}")
 
@@ -116,23 +117,25 @@ class SLURM(WorkloadManager):
     manager_check_cmd = "sinfo"
 
     @staticmethod
-    def get_jobs_from_handler(handler):
-        result = handler.execute('squeue -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %R %C"')
+    def get_jobs_from_handler(handler: ShellHandler):
+        result = handler.execute("squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}")
         raise NotImplementedError("SLURM job parsing not implemented currently.")
 
-    def submit_job(self, jobscript_path):
+    def submit_job(self, jobscript_path: str):
         return self.handler.execute(f"sbatch --requeue {jobscript_path}")
 
-    def rerun_job(self, job):
+    def rerun_job(self, job: PBSJob):
         # TODO: implement
         # afternotok ensures job is only requeued if it failed (i.e. timed out)
         #sbatch --dependency=afternotok:<jobid> <script>
         raise NotImplementedError()
 
-def get_workload_manager(handler):
+def get_workload_manager(handler: Union[ShellHandler, str], logger: Union[Logger, None]=None):
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler)
+    if logger is None:
+        logger = loggers.current
     for man_cls in [PBS, SLURM]:
         if man_cls.is_valid(handler):
-            return man_cls(handler)
+            return man_cls(handler, logger)
     raise RuntimeError("No recognised workload manager found on cluster. Valid managers are PBS, SLURM.")

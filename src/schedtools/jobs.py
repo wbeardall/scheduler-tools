@@ -1,4 +1,6 @@
 import json
+from logging import Logger
+from typing import Union
 
 from schedtools.exceptions import JobSubmissionError
 from schedtools.log import loggers
@@ -8,7 +10,7 @@ from schedtools.shell_handler import ShellHandler
 
 PRIORITY_RERUN_FILE = "$HOME/.priority-rerun"
 
-def get_job_percentage(handler):
+def get_job_percentage(handler: ShellHandler):
     """Get percentage completion of current running / queued jobs.
     
     Queries the cluster using `qstat -p`, and so does not return full job information.
@@ -37,7 +39,7 @@ def get_job_percentage(handler):
                 running_jobs[id_] = float(pc.replace("%", ""))
     return running_jobs
 
-def get_rerun_from_file(handler):
+def get_rerun_from_file(handler: ShellHandler):
     f"""Get priority rerun jobs from a cached rerun queue file on the cluster.
 
     Expects any priority jobs to be stored in `{PRIORITY_RERUN_FILE}` (json-formatted)
@@ -52,7 +54,7 @@ def get_rerun_from_file(handler):
     return [PBSJob({"id":k, "jobscript_path":v}) for k,v in raw.items()]
 
 
-def rerun_jobs(handler, threshold=95, logger=None, **kwargs):
+def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     
     kwargs are provided to pass e.g. passwords to the created handler instance 

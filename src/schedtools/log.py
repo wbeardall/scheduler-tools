@@ -1,12 +1,13 @@
 import logging
 import os
+from typing import Union
 
 import systemd.journal as journald
 
 from schedtools.utils import Singleton, journald_active, systemd_service
 
 
-def get_logger(name=None):
+def get_logger(name: Union[str, None] = None):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable.
     
     If `systemd-journald` is active, and the program is being run as a `systemd` service, 

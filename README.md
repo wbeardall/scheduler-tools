@@ -22,12 +22,16 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 
 ## Contents
 
-### Rerun
+### `rerun`
 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
 This program runs itself in a daemon context if not running as a service, and so is `SIGHUP`-safe.
 
 #### Usage
+
+```
+rerun -h
+```
 
 If you have manager-level privileges on the cluster, usage is straightforward, as the program can simply call the `qrerun`
 command with the IDs of any jobs that are at risk of timing out. 
@@ -61,6 +65,18 @@ conda activate schedtools
 pip install -e .
 ```
 
+### `convert-jobscripts`
+
+Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 
+
+**Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a 
+`-s` flag. 
+
+#### Usage
+
+```
+convert-jobscripts -h
+```
 
 ## Usage
 
