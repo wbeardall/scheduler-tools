@@ -16,7 +16,10 @@ def conversion_helper(path,recursive, to, updates = {}):
             conversion_helper(os.path.join(path,file), recursive=recursive, to=to)
 
 def convert_jobscripts():
-    """Convert jobscripts from PBS format to SLURM format and vice versa."""
+    """Convert jobscripts from PBS format to SLURM format and vice versa. 
+    
+    Note that any paths in the jobscripts should be consistent across the two clusters 
+    (for example, be of the form `$HOME/path/to/file`, with the same relative path.)"""
     parser = argparse.ArgumentParser(description=convert_jobscripts.__doc__)
     parser.add_argument("format",type=str,
         choices=["pbs", "slurm"],

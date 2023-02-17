@@ -74,6 +74,15 @@ pip install -e .
 
 Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 
 
+**Note** In order for converted jobscripts to work on the other cluster, any paths in the jobscript must be consistent 
+across both file structures. In order to achieve this, it is sufficient to ensure that:
+
+1. All paths in the jobscript are relative to `$HOME`
+2. The directory paths are consistent relative to `$HOME` across clusters. 
+
+As an example, `$HOME/my-project/outputs/out.log` would be consistent, assuming `my-project` is located in `$HOME` on both
+clusters.
+
 **Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a 
 `-s` flag. 
 
