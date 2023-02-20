@@ -1,6 +1,10 @@
 import subprocess
 import sys
 
+def get_service_file(name):
+    name = name.lower().replace(' ', '-')
+    return f"/etc/systemd/system/{name}.service"
+
 def make_service(name: str, command: str, environment: dict = {}):
     if len(environment):
         env_str = "\n".join([f'{k}="{v}"' for k,v in environment.items()]) + "\n"
@@ -11,7 +15,7 @@ def make_service(name: str, command: str, environment: dict = {}):
     python = sys.executable
     service_id = name.lower().replace(' ', '-')
 
-    service_file = f"/etc/systemd/system/{service_id}.service"
+    service_file = get_service_file(service_id)
     service_conf = f"/etc/{service_id}-service.conf"
 
     service_def = f"""[Unit]
@@ -43,7 +47,7 @@ def remove_service(name: str):
     allowed = ["rerun"]
     assert name in allowed, "We do not allow removal of arbitrary services with this script."
     service_id = name.lower().replace(' ', '-')
-    service_file = f"/etc/systemd/system/{service_id}.service"
+    service_file = get_service_file(service_id)
     service_conf = f"/etc/{service_id}-service.conf"
     subprocess.call(["sudo", "systemctl", "stop", service_id])
     subprocess.call(["sudo", "rm", service_file])
