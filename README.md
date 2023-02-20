@@ -22,7 +22,26 @@ it again unless your box catches fire (or if you do one of the following things)
 
 Only PBS is supported for now. Functionality might be extended to support SLURM in the future.
 
-## Contents
+## Installation
+
+This package relies on [systemd-python](https://pypi.org/project/systemd-python/) to interact with `journald`. As such,
+there are a few non-Python dependencies. These can be installed by running
+
+```
+sudo apt-get install gcc pkg-config libsystemd-dev
+```
+
+We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode. 
+This minimises the probability that changes to the environment breaks the service in a way that might not be noticed 
+for a while (in case you don't check your logs frequently!).
+
+```
+conda create -n schedtools python=3.8
+conda activate schedtools
+pip install -e .
+```
+
+## Programs
 
 ### `rerun`
 
@@ -50,25 +69,6 @@ PBS job information (call `qstat -f` to see what this datastructure looks like).
 2. Not delete your jobscripts after submission, as `rerun` will need access to them to resubmit the jobs
 
     **Note** You can use your ephemeral storage for these except in the case of extremely long-running jobs
-
-## Installation
-
-This package relies on [systemd-python](https://pypi.org/project/systemd-python/) to interact with `journald`. As such,
-there are a few non-Python dependencies. These can be installed by running
-
-```
-sudo apt-get install gcc pkg-config libsystemd-dev
-```
-
-We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode. 
-This minimises the probability that changes to the environment breaks the service in a way that might not be noticed 
-for a while (in case you don't check your logs frequently!).
-
-```
-conda create -n schedtools python=3.8
-conda activate schedtools
-pip install -e .
-```
 
 ### `convert-jobscripts`
 
@@ -98,8 +98,7 @@ convert-jobscripts -h
 
 Remove `schedtools` utilities that have been registered as services with `systemd`.
 
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a 
-`-s` flag. 
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
 
 #### Usage
 
