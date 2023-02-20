@@ -94,6 +94,21 @@ For detailed information on the CLI for the `convert-jobscripts` utility, run th
 convert-jobscripts -h
 ```
 
+### `check-status`
+
+Check the status of `schedtools` utilities that have been registered as services with `systemd`.
+In the future, this might be expanded to include status checks for daemonized `schedtools` utilities.
+
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `check-status` utility, run the following command:
+
+```
+check-status -h
+```
+
 ### `remove-service`
 
 Remove `schedtools` utilities that have been registered as services with `systemd`.
