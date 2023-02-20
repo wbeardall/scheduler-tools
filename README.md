@@ -103,10 +103,10 @@ In the future, this might be expanded to include status checks for daemonized `s
 
 #### Usage
 
-For detailed information on the CLI for the `check-status` utility, run the following command:
+`check-status` has no arguments. Simply call it as follows:
 
 ```
-check-status -h
+check-status
 ```
 
 ### `remove-service`
