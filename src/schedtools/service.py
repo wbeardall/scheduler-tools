@@ -38,3 +38,14 @@ WantedBy=multi-user.target
     subprocess.call(["sudo", "systemctl", "daemon-reload"])
     subprocess.call(["sudo", "systemctl", "enable", service_id])
     subprocess.call(["sudo", "systemctl", "start", service_id])
+
+def remove_service(name: str):
+    allowed = ["rerun"]
+    assert name in allowed, "We do not allow removal of arbitrary services with this script."
+    service_id = name.lower().replace(' ', '-')
+    service_file = f"/etc/systemd/system/{service_id}.service"
+    service_conf = f"/etc/{service_id}-service.conf"
+    subprocess.call(["sudo", "systemctl", "stop", service_id])
+    subprocess.call(["sudo", "rm", service_file])
+    subprocess.call(["sudo", "rm", service_conf])
+    subprocess.call(["sudo", "systemctl", "daemon-reload"])

@@ -94,6 +94,21 @@ For detailed information on the CLI for the `convert-jobscripts` utility, run th
 convert-jobscripts -h
 ```
 
+### `remove-service`
+
+Remove `schedtools` utilities that have been registered as services with `systemd`.
+
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a 
+`-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `remove-service` utility, run the following command:
+
+```
+remove-service -h
+```
+
 ## Package Usage
 
 Recommended: Run the provided tools as services (with the `-s` flag), in a dedicated environment.
@@ -191,5 +206,7 @@ systemctl status rerun.service
 If your machine uses `journald` (likely), then logs can be accessed by calling
 
 ```
-journalctl -u rerun.service
+journalctl -fu rerun.service
 ```
+
+The `-f` flag in the above only shows the most recent logs, rather than the whole log stack.

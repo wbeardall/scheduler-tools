@@ -6,7 +6,6 @@ import systemd.journal as journald
 
 from schedtools.utils import Singleton, journald_active, systemd_service
 
-
 def get_logger(name: Union[str, None] = None):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable.
     
@@ -27,9 +26,9 @@ def get_logger(name: Union[str, None] = None):
         handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
     
     log = logging.getLogger(name)
+    log.setLevel(logging.INFO)
     for handler in handlers:
         log.addHandler(handler)
-    log.setLevel(logging.INFO)
     return log
 
 class Loggers(dict, metaclass=Singleton):
