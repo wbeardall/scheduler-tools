@@ -4,12 +4,14 @@ import re
 from typing import Union
 
 from schedtools.pbs_dataclasses import PBSJob
-from schedtools.exceptions import JobSubmissionError
+from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
 
 class WorkloadManager(ABC):
     manager_check_cmd = None
+    submit_cmd = None
+    delete_cmd = None
     def __init__(self, handler: Union[ShellHandler, str], logger: Union[Logger, None] = None) -> None:
         if not isinstance(handler, ShellHandler):
             handler = ShellHandler(handler)
@@ -36,9 +38,19 @@ class WorkloadManager(ABC):
     def get_jobs_from_handler(handler: ShellHandler):
         ...
 
-    @abstractmethod
-    def submit_job(self, jobscript: str):
-        ...
+    def submit_job(self, jobscript_path: str):
+        result = self.handler.execute(f"{self.submit_cmd} {jobscript_path}")
+        if result.returncode:
+            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            self.logger.info(msg)
+            raise JobSubmissionError(msg)
+
+    def delete_job(self, job_id: str):
+        result = self.handler.execute(f"{self.delete_cmd} {job_id}")
+        if result.returncode:
+            msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            self.logger.info(msg)
+            raise JobDeletionError(msg)
 
     @abstractmethod
     def rerun_job(self, job: PBSJob):
@@ -46,6 +58,8 @@ class WorkloadManager(ABC):
 
 class PBS(WorkloadManager):
     manager_check_cmd = "qstat"
+    submit_cmd = "qsub"
+    delete_cmd = "qdel"
     qrerun_allowed = True
 
     @staticmethod
@@ -83,9 +97,6 @@ class PBS(WorkloadManager):
         jobs.append(current_job)
         return jobs
 
-    def submit_job(self, jobscript_path: str):
-        return self.handler.execute(f"qsub {jobscript_path}")
-
     def rerun_job(self, job: PBSJob):
         if self.qrerun_allowed:
             result = self.handler.execute(f"qrerun {job.id}")
@@ -115,14 +126,13 @@ class PBS(WorkloadManager):
 
 class SLURM(WorkloadManager):
     manager_check_cmd = "sinfo"
+    submit_cmd = "sbatch --requeue"
+    delete_cmd = "scancel"
 
     @staticmethod
     def get_jobs_from_handler(handler: ShellHandler):
         result = handler.execute("squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}")
         raise NotImplementedError("SLURM job parsing not implemented currently.")
-
-    def submit_job(self, jobscript_path: str):
-        return self.handler.execute(f"sbatch --requeue {jobscript_path}")
 
     def rerun_job(self, job: PBSJob):
         # TODO: implement

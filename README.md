@@ -70,6 +70,18 @@ PBS job information (call `qstat -f` to see what this datastructure looks like).
 
     **Note** You can use your ephemeral storage for these except in the case of extremely long-running jobs
 
+### `delete-duplicate-jobs`
+
+Delete any duplicated job submissions on a cluster.
+
+#### Usage
+
+For detailed information on the CLI for the `delete-duplicate-jobs` utility, run the following command:
+
+```
+delete-duplicate-jobs -h
+```
+
 ### `convert-jobscripts`
 
 Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 

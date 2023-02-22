@@ -2,9 +2,9 @@ import json
 from logging import Logger
 from typing import Union
 
-from schedtools.exceptions import JobSubmissionError
+from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
-from schedtools.managers import get_workload_manager
+from schedtools.managers import get_workload_manager, WorkloadManager
 from schedtools.pbs_dataclasses import PBSJob
 from schedtools.shell_handler import ShellHandler
 
@@ -53,12 +53,48 @@ def get_rerun_from_file(handler: ShellHandler):
     raw = json.loads("\n".join(result.stdout))
     return [PBSJob({"id":k, "jobscript_path":v}) for k,v in raw.items()]
 
+def delete_queued_duplicates(
+    handler: Union[ShellHandler, str], 
+    manager: Union[WorkloadManager,None] = None,
+    logger: Union[Logger, None] = None,
+    count_running: bool = False):
+    """Delete duplicates of queued jobs.
+    
+    Args:
+        handler: Shell handler instance, or SSH host alias
+        manager: Workload manager instance (defaults to `None`)
+        logger: Logger instance (defaults to `None`)
+        count_running: Include running jobs when identifying duplicates
+    """
+    if isinstance(handler, str):
+        handler = ShellHandler(handler)
+    if manager is None:
+        manager = get_workload_manager(handler, logger or loggers.current)
+    jobs = manager.get_jobs()
+    queued_names = []
+    duplicates = []
+    for job in jobs:
+        if not count_running and not job.is_queued:
+            continue
+        if job["Job_Name"] in queued_names:
+            duplicates.append(job)
+        else:
+            queued_names.append(job["Job_Name"])
+    for job in duplicates:
+        try:
+            manager.delete_job(job.id)
+        except JobDeletionError:
+            pass
+
 
 def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     
     kwargs are provided to pass e.g. passwords to the created handler instance 
     without needing them stored anywhere.
+
+    Args:
+
     """
     if logger is None:
         logger = loggers.current
@@ -71,7 +107,7 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
     
     priority_rerun = get_rerun_from_file(handler)
     priority_ids = [el["id"] for el in priority_rerun]
-    new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job["id"] in priority_ids]
+    new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job.id in priority_ids]
     to_rerun = [el for chunk in [priority_rerun, new_rerun] for el in chunk]
     for_future = []
     if len(to_rerun):

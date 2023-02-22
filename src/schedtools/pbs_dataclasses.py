@@ -6,6 +6,15 @@ class PBSJob(dict):
     Follows field name conventions of `qstat -f` for simplicity, even though
     these are non-Pythonic.
     """
+    status_dict = dict(
+        E="exiting",
+		H="held",
+		Q="queued",
+		R="running",
+		T="moving",
+		W="waiting",
+		S="suspended"
+    )
     # TODO: Make into a proper dataclass if needed.
     def __getattr__(self, key, *args, **kwargs):
         try:
@@ -16,6 +25,7 @@ class PBSJob(dict):
     @property
     def id(self):
         return self["id"]
+        
     @property
     def jobscript_path(self):
         if "jobscript_path" in self:
@@ -27,3 +37,15 @@ class PBSJob(dict):
         if "resources_used.walltime" in self:
             return 100 * walltime_to(self["resources_used.walltime"]) / walltime_to(self["Resource_List.walltime"]) 
         return 0
+
+    @property
+    def status(self):
+        return self.status_dict[self["job_state"]]
+
+    @property
+    def is_running(self):
+        return self.status=="running"
+
+    @property
+    def is_queued(self):
+        return self.status=="queued"
