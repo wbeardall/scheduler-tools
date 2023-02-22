@@ -8,6 +8,7 @@ from schedtools.utils import connect_to_host
 
 def delete_duplicate_jobs():
     """Delete duplicate jobs on a cluster."""
+    os.environ["SCHEDTOOLS_PROG"] = "delete-duplicate-jobs"
     parser = argparse.ArgumentParser(description=delete_duplicate_jobs.__doc__)
     parser.add_argument("host",type=str,
         help="Host alias in `~/.ssh/config`.")
