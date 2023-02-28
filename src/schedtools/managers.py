@@ -56,6 +56,13 @@ class WorkloadManager(ABC):
     def rerun_job(self, job: PBSJob):
         ...
 
+class UCL(WorkloadManager):
+    # UCL cluster uses a variant of PBS, with slightly different commands
+    manager_check_cmd = "jobhist"
+    submit_cmd = "qsub"
+    delete_cmd = "qdel"
+    # TODO: Implement rest of functionality
+
 class PBS(WorkloadManager):
     manager_check_cmd = "qstat"
     submit_cmd = "qsub"

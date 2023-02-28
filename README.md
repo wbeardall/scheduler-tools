@@ -109,16 +109,18 @@ convert-jobscripts -h
 ### `check-status`
 
 Check the status of `schedtools` utilities that have been registered as services with `systemd`.
-In the future, this might be expanded to include status checks for daemonized `schedtools` utilities.
+This command can be used to check locally-registered utilities, or those on a remote machine by specifying the 
+hostname when calling the program. In the future, this might be expanded to include status checks for 
+daemonized `schedtools` utilities.
 
 **Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
 
 #### Usage
 
-`check-status` has no arguments. Simply call it as follows:
+For detailed information on the CLI for the `check-status` utility, run the following command:
 
 ```
-check-status
+check-status -h
 ```
 
 ### `remove-service`

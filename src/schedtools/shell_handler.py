@@ -27,7 +27,7 @@ class ShellHandler:
     def close(self):
         self.ssh.close()
 
-    def execute(self, cmd: str):
+    def execute(self, cmd: str, unformat=False):
         """
 
         :param cmd: the command to be executed on the remote computer
@@ -60,9 +60,10 @@ class ShellHandler:
                     shout = []
                 break
             else:
-                # get rid of 'coloring and formatting' special characters
-                shout.append(re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]').sub('', line).
-                             replace('\b', '').replace('\r', ''))
+                if unformat:
+                    # get rid of 'coloring and formatting' special characters
+                    line = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]').sub('', line)
+                shout.append(line.replace('\b', '').replace('\r', ''))
 
         # first and last lines of shout/sherr contain a prompt
         if shout and echo_cmd in shout[-1]:

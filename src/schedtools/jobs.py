@@ -134,6 +134,7 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
                 succeeded.append(to_rerun.pop(i))
                 break
 
+    logger.info(f"{len(to_rerun)} jobs to rerun ({len(jobs)} in queue).")
 
     failed = []
     if len(to_rerun):
@@ -146,7 +147,7 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
                 
 
     if len(succeeded):
-        # Log any jobs that haven't been able to be requeued
+        # Log any jobs that have been successfully requeued
         success_json = json.dumps([job.id for job in succeeded])
         result = handler.execute("echo '" + success_json + f"\n' > {SUCCESS_RERUN_FILE}")
         if result.returncode:
