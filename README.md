@@ -137,6 +137,33 @@ For detailed information on the CLI for the `remove-service` utility, run the fo
 remove-service -h
 ```
 
+### `remote-command`
+
+Run arbitrary commands on a remote machine. This is a simple quality-of-life utility that prevents you
+having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the 
+`stdout`, `stderr` and exit status on the remote machine.
+
+#### Usage
+
+This utility does not require any additional command modification or quotations around the command to be run.
+Simply prepend any command you'd usually run with
+
+```
+remote-command hostname
+```
+
+For example,
+
+```
+remote-command hostname ls "path/to/my directory"
+```
+
+For detailed information on the CLI for the `remote-command` utility, run the following command:
+
+```
+remote-command -h
+```
+
 ## Package Usage
 
 Recommended: Run the provided tools as services (with the `-s` flag), in a dedicated environment.
