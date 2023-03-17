@@ -45,7 +45,11 @@ class WorkloadManager(ABC):
             self.logger.info(msg)
             raise JobSubmissionError(msg)
 
-    def delete_job(self, job_id: str):
+    def delete_job(self, job: Union[str, PBSJob]):
+        if isinstance(job,str):
+            job_id = job
+        else:
+            job_id = job.id
         result = self.handler.execute(f"{self.delete_cmd} {job_id}")
         if result.returncode:
             msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr[0].strip()})"

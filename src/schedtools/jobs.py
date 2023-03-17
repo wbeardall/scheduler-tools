@@ -101,7 +101,8 @@ def delete_queued_duplicates(
             pass
 
 
-def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, **kwargs):
+def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, 
+               continue_on_rerun: bool= False, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     
     kwargs are provided to pass e.g. passwords to the created handler instance 
@@ -142,6 +143,8 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
             try: 
                 manager.rerun_job(job)
                 succeeded.append(job)
+                if not continue_on_rerun:
+                    manager.delete_job(job)
             except JobSubmissionError:
                 failed.append(job)
                 

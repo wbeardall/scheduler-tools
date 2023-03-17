@@ -28,6 +28,9 @@ def rerun():
         help="Interval (in hours) at which to check for jobs to rerun.")
     parser.add_argument("-p","--password",type=str,default=None,
         help="Password for host authentication.")
+    parser.add_argument("-c","--continue_on_rerun",action="store_true",
+        help="Allow running jobs to continue after requeuing. Only enable if having multiple instances "
+            "of the same job isn't going to corrupt output data or duplicate results.")
     parser.add_argument("-s","--service",action="store_true",
         help="Register this program as a service rather than running it.")
     args = parser.parse_args()
@@ -51,6 +54,8 @@ def rerun():
 
     if args.service:
         command = f"{__file__} {args.host} -t {threshold:.1f} -i {args.interval:.1f}"
+        if args.continue_on_rerun:
+            command += " -c"
         env_vars = {
             "SSH_CONFIG":os.path.expanduser("~/.ssh/config"),
             "SCHEDTOOLS_USER":os.environ["LOGNAME"],
@@ -68,13 +73,13 @@ def rerun():
     # Only daemonize if not being run by systemd.
     if systemd_service():
         while True:
-            rerun_jobs(handler=args.host,threshold=threshold,logger=logger,**kwargs)
+            rerun_jobs(handler=args.host,threshold=threshold,logger=logger,continue_on_rerun=args.continue_on_rerun,**kwargs)
             time.sleep(args.interval*3600)
     else:
         logger.info("Scheduler created.")
         scheduler.add_job(rerun_jobs, 'interval', hours=args.interval,
             next_run_time=datetime.datetime.now(),
-            kwargs=dict(handler=args.host,threshold=threshold,logger=logger,**kwargs))
+            kwargs=dict(handler=args.host,threshold=threshold,logger=logger,continue_on_rerun=args.continue_on_rerun,**kwargs))
         logger.info("Rerun task scheduled.")
         # Wrap in DaemonContext to prevent exit after logout
         with daemon.DaemonContext(files_preserve=[handler.stream for handler in logger.handlers if hasattr(handler,"stream")]):
