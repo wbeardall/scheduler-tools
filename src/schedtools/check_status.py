@@ -15,9 +15,9 @@ def _check_status_local(services, show_logs):
     print("The following services are registered: \n" + "\n".join(registered))
     terminal_width, _ = shutil.get_terminal_size()
     print("_"*terminal_width)
-    prefix = "sudo " if show_logs else ""
+    prefix = ["sudo"] if show_logs else []
     for service in registered:
-        subprocess.call(prefix + f"systemctl status {service}.service")
+        subprocess.call(prefix + f"systemctl status {service}.service".split())
         print("_"*terminal_width)
 
 def _check_status_remote(host, services, show_logs):
