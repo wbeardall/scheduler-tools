@@ -17,7 +17,7 @@ def _check_status_local(services, show_logs):
     print("_"*terminal_width)
     prefix = "sudo " if show_logs else ""
     for service in registered:
-        subprocess.call(prefix + f"systemctl status {service}.service".split())
+        subprocess.call(prefix + f"systemctl status {service}.service")
         print("_"*terminal_width)
 
 def _check_status_remote(host, services, show_logs):
