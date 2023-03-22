@@ -117,23 +117,19 @@ class PBS(WorkloadManager):
                 if result.returncode==159:
                     self.logger.info("User not authorized to use `qrerun`. Attempting to requeue from jobscript.")
                     self.qrerun_allowed = False
-                else:
-                    msg = f"Rerun failed with status {result.returncode} ({result.stderr[0].strip()})."
-                    self.logger.info(msg)
-                    raise JobSubmissionError(msg)
             else:
                 self.logger.info(f"Rerunning job {job.id}")
-        if not self.qrerun_allowed:
-            result = self.handler.execute(f"qsub {job.jobscript_path}")
-            if result.returncode:
-                msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})"
-                self.logger.info(msg)
-                # Number of jobs exceeds user's limit
-                if result.returncode==38:
-                    pass
-                raise JobSubmissionError(msg)
-            else:
-                self.logger.info(f"Rerunning job {job.id}")
+                return
+        result = self.handler.execute(f"qsub {job.jobscript_path}")
+        if result.returncode:
+            msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            self.logger.info(msg)
+            # Number of jobs exceeds user's limit
+            if result.returncode==38:
+                pass
+            raise JobSubmissionError(msg)
+        else:
+            self.logger.info(f"Rerunning job {job.id}")
 
 class SLURM(WorkloadManager):
     manager_check_cmd = "sinfo"
