@@ -49,7 +49,7 @@ def get_rerun_from_file(handler: ShellHandler):
         handler: `ShellHandler` instance to use to query cluster
     """
     result = handler.execute(f"cat {PRIORITY_RERUN_FILE}")
-    if result.returncode:
+    if result.returncode or not len(result.stdout):
         return []
     raw = json.loads("\n".join(result.stdout))
     return [PBSJob({"id":k, "jobscript_path":v}) for k,v in raw.items()]
@@ -63,7 +63,7 @@ def get_success_from_file(handler: ShellHandler):
         handler: `ShellHandler` instance to use to query cluster
     """
     result = handler.execute(f"cat {SUCCESS_RERUN_FILE}")
-    if result.returncode:
+    if result.returncode or not len(result.stdout):
         return []
     return json.loads("\n".join(result.stdout))
 
