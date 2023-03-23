@@ -17,6 +17,8 @@ class ShellHandler:
         channel = self.ssh.invoke_shell()
         self.stdin = channel.makefile('wb')
         self.stdout = channel.makefile('r')
+        # Execute a dummy command to clear any login-related shell junk
+        self.execute("echo")
 
     def __del__(self):
         try:
