@@ -152,4 +152,5 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
         logger.info(f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution.")
     else:
         # Can safely remove the cache
-        os.remove(RERUN_TRACKED_CACHE)
+        if os.path.exists(RERUN_TRACKED_CACHE):
+            os.remove(RERUN_TRACKED_CACHE)
