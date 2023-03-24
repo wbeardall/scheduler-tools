@@ -1,5 +1,4 @@
 from schedtools.pbs_dataclasses import PBSJob
-from schedtools.jobs import PRIORITY_RERUN_FILE, get_rerun_from_file
 from schedtools.managers import PBS
 from schedtools.shell_handler import ShellHandler, SSHResult
 
@@ -141,14 +140,3 @@ def test_get_jobs():
         # Test attribute-style field access
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
-
-def test_rerun_from_file():
-    handler = DummyHandler()
-    jobs = get_rerun_from_file(handler)
-    expected = {
-        "1234": "/path/to/file1",
-        "1235": "/path/to/file2"
-    }
-    for i, (k,v) in enumerate(expected.items()):
-        assert jobs[i]["id"] == k
-        assert jobs[i].jobscript_path == v

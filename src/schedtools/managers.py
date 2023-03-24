@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod, abstractstaticmethod
+from functools import partialmethod
 from logging import Logger
 import re
 from typing import Union
 
-from schedtools.pbs_dataclasses import PBSJob
+from schedtools.pbs_dataclasses import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
@@ -55,6 +56,21 @@ class WorkloadManager(ABC):
             msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr[0].strip()})"
             self.logger.info(msg)
             raise JobDeletionError(msg)
+        
+    def was_killed(self, job: PBSJob):
+        return self.was_killed_walltime(job) or self.was_killed_mem(job)
+
+    @abstractmethod
+    def was_killed_reason(self, job: PBSJob):
+        ...
+
+    @abstractmethod
+    def was_killed_mem(self, job: PBSJob):
+        ...
+
+    @abstractmethod
+    def was_killed_walltime(self, job: PBSJob):
+        ...
 
     @abstractmethod
     def rerun_job(self, job: PBSJob):
@@ -106,7 +122,7 @@ class PBS(WorkloadManager):
             elif current_key:
                 current_job[current_key] += line.strip()
         jobs.append(current_job)
-        return jobs
+        return Queue(jobs)
 
     def rerun_job(self, job: PBSJob):
         if self.qrerun_allowed:
@@ -130,6 +146,19 @@ class PBS(WorkloadManager):
             raise JobSubmissionError(msg)
         else:
             self.logger.info(f"Rerunning job {job.id}")
+
+    def was_killed_reason(self, job: PBSJob, reason):
+        result = self.handler.execute(f"tail {job.error_path}")
+        if result.returncode:
+            # TODO: Make more robust
+            return False
+        tail = "\n".join(result.stdout)
+        if f"PBS: job killed: {reason}" in tail:
+            return True
+        return False
+        
+    was_killed_mem = partialmethod(was_killed_reason,reason="mem")
+    was_killed_walltime = partialmethod(was_killed_reason,reason="walltime")
 
 class SLURM(WorkloadManager):
     manager_check_cmd = "sinfo"

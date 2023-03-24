@@ -1,15 +1,22 @@
 import json
+import os
 from logging import Logger
 from typing import Union
 
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.managers import get_workload_manager, WorkloadManager
-from schedtools.pbs_dataclasses import PBSJob
+from schedtools.pbs_dataclasses import PBSJob, Queue
 from schedtools.shell_handler import ShellHandler
+from schedtools.utils import systemd_service
 
-PRIORITY_RERUN_FILE = "$HOME/.priority-rerun"
-SUCCESS_RERUN_FILE = "$HOME/.success-rerun"
+RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
+if systemd_service():
+    CACHE_DIR = "/var/tmp/rerun-service"
+else:
+    CACHE_DIR = os.path.join(os.path.expanduser("~"),".rerun")
+os.makedirs(CACHE_DIR, exist_ok=True)
+RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR,"rerun-tracked-cache.json")
 
 def get_job_percentage(handler: ShellHandler):
     """Get percentage completion of current running / queued jobs.
@@ -40,32 +47,19 @@ def get_job_percentage(handler: ShellHandler):
                 running_jobs[id_] = float(pc.replace("%", ""))
     return running_jobs
 
-def get_rerun_from_file(handler: ShellHandler):
-    f"""Get priority rerun jobs from a cached rerun queue file on the cluster.
+def get_tracked_from_file(handler: ShellHandler):
+    f"""Get tracked job list from file
 
-    Expects any priority jobs to be stored in `{PRIORITY_RERUN_FILE}` (json-formatted)
+    Expects tracked jobs to be stored in `{RERUN_TRACKED_FILE}` (json-formatted)
     
     Args:
         handler: `ShellHandler` instance to use to query cluster
     """
-    result = handler.execute(f"cat {PRIORITY_RERUN_FILE}")
+    result = handler.execute(f"cat {RERUN_TRACKED_FILE}")
     if result.returncode or not len(result.stdout):
         return []
     raw = json.loads("\n".join(result.stdout))
-    return [PBSJob({"id":k, "jobscript_path":v}) for k,v in raw.items()]
-
-def get_success_from_file(handler: ShellHandler):
-    f"""Get successful rerun list from file
-
-    Expects any successfully rerun jobs to be stored in `{SUCCESS_RERUN_FILE}` (json-formatted)
-    
-    Args:
-        handler: `ShellHandler` instance to use to query cluster
-    """
-    result = handler.execute(f"cat {SUCCESS_RERUN_FILE}")
-    if result.returncode or not len(result.stdout):
-        return []
-    return json.loads("\n".join(result.stdout))
+    return Queue([PBSJob(job) for job in raw])
 
 def delete_queued_duplicates(
     handler: Union[ShellHandler, str], 
@@ -118,46 +112,36 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
         handler = ShellHandler(handler, **kwargs)
 
     manager = get_workload_manager(handler, logger)
-    jobs = manager.get_jobs()
+    queued = manager.get_jobs()
     
-    priority_rerun = get_rerun_from_file(handler)
-    to_skip = get_success_from_file(handler)
-    priority_ids = [el["id"] for el in priority_rerun]
-    new_rerun = [job for job in jobs if job.percent_completion >= threshold and not job.id in priority_ids]
-    to_rerun = [el for chunk in [priority_rerun, new_rerun] for el in chunk]
-    succeeded = []
-    for skip in to_skip:
-        for i, job in enumerate(to_rerun):
-            # Add to succeeded to ensure that the job isn't requeued next call.
-            # If the job wasn't going to be rerun, we don't need to save the job for
-            # skipping in future.
-            if job.id == skip:
-                succeeded.append(to_rerun.pop(i))
-                break
+    tracked = get_tracked_from_file(handler)
+    if os.path.exists(RERUN_TRACKED_CACHE):
+        with open(RERUN_TRACKED_CACHE, "r") as f:
+            cached = Queue([job for job in json.load(f)])
+        tracked.update(cached)
+        os.remove(RERUN_TRACKED_CACHE)
+    to_rerun = Queue([job for job in tracked if (job not in queued) and manager.was_killed(job)])
+    to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
+    # Update list of tracked jobs
+    tracked.update(queued)
 
-    logger.info(f"{len(to_rerun)} jobs to rerun ({len(jobs)} in queue).")
+    logger.info(f"{len(to_rerun)} jobs to rerun ({len(queued)} in queue).")
 
-    failed = []
-    if len(to_rerun):
-        for job in to_rerun:
-            try: 
-                manager.rerun_job(job)
-                succeeded.append(job)
-                if not continue_on_rerun:
-                    manager.delete_job(job)
-            except JobSubmissionError:
-                failed.append(job)
+    for job in to_rerun:
+        try: 
+            manager.rerun_job(job)
+            # Can untrack the job
+            tracked.pop(job)
+            if job in queued and not continue_on_rerun:
+                manager.delete_job(job)
+        except JobSubmissionError:
+            pass
                 
-
-    if len(succeeded):
-        # Log any jobs that have been successfully requeued
-        success_json = json.dumps([job.id for job in succeeded])
-        result = handler.execute("echo '" + success_json + f"\n' > {SUCCESS_RERUN_FILE}")
-        if result.returncode:
-            logger.info(f"Saving successful jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
-    if len(failed):
-        # Log any jobs that haven't been able to be requeued
-        failed_json = json.dumps({job.id:job.jobscript_path for job in failed})
-        result = handler.execute("echo '" + failed_json + f"\n' > {PRIORITY_RERUN_FILE}")
-        if result.returncode:
-            logger.info(f"Saving priority jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
+    # Update the tracked job list
+    tracked_json = json.dumps([job for job in tracked])
+    result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
+    if result.returncode:
+        logger.info(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
+        with open(RERUN_TRACKED_CACHE,"w") as f:
+            f.write(tracked_json)
+        logger.info(f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution.")

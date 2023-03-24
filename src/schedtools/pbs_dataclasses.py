@@ -1,3 +1,5 @@
+from typing import List, Union
+
 from schedtools.utils import walltime_to
 
 class PBSJob(dict):
@@ -31,6 +33,10 @@ class PBSJob(dict):
         if "jobscript_path" in self:
             return self["jobscript_path"]
         return self["Submit_arguments"].replace("\n","").split()[-1]
+    
+    @property
+    def error_path(self):
+        return self["Error_Path"].split(":")[-1]
 
     @property
     def percent_completion(self):
@@ -49,3 +55,34 @@ class PBSJob(dict):
     @property
     def is_queued(self):
         return self.status=="queued"
+    
+class Queue:
+    def __init__(self,jobs: List[PBSJob]):
+        self.jobs = {j.id:j for j in jobs}
+
+    def pop(self,job: Union[str, PBSJob]):
+        if isinstance(job, PBSJob):
+            job = job.id
+        self.jobs.pop(job)
+
+    def append(self,job: PBSJob):
+        self.jobs[job.id] = job
+
+    def extend(self, jobs: List[PBSJob]):
+        self.update({j.id:j for j in jobs})
+
+    def update(self, other: Union[dict, "Queue"]):
+        if isinstance(other, Queue):
+            other = other.jobs
+        self.jobs.update(other)
+
+    def __iter__(self):
+        return iter(self.jobs.values())
+    
+    def __contains__(self, job):
+        if isinstance(job, PBSJob):
+            job = job.id
+        return job in self.jobs.keys()
+    
+    def __len__(self):
+        return len(self.jobs)
