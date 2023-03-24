@@ -1,8 +1,15 @@
+import json
+import logging
+import os
+
+import pytest
+
 from schedtools.pbs_dataclasses import PBSJob
+from schedtools.jobs import RERUN_TRACKED_FILE, RERUN_TRACKED_CACHE, rerun_jobs, get_tracked_cache
 from schedtools.managers import PBS
 from schedtools.shell_handler import ShellHandler, SSHResult
 
-qstat_raw_example = """a bunch of junk data at the top
+dummy_queue = """a bunch of junk data at the top
 of the file
 intended to simulate cluster information echoed at login
 
@@ -111,18 +118,34 @@ Job Id: 7013475.pbs
     project = _pbs_project_default
 """
 
+with open(os.path.join(os.path.dirname(__file__),"dummy_tracked.json"),"r") as f:
+    dummy_tracked = f.readlines()
+
 class DummyHandler(ShellHandler):
-    def __init__(self,allow = [], fail = []):
-        pass
+    def __init__(self,valid=True, jobs=True, tracked=True, rerun=True, memkill=True, wallkill=True,qsub=True):
+        self.responses = {
+            "qstat": SSHResult([], [],[],0) if valid else SSHResult([], [],[],1),
+            "qstat -f": SSHResult([], dummy_queue.split("\n"),[],0) if jobs else SSHResult([], [],[],0),
+            f"cat {RERUN_TRACKED_FILE}": SSHResult([], dummy_tracked,[],0) if tracked else SSHResult([], [],[],1),
+            "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70134": (
+                SSHResult([],["PBS: job killed: mem"],[],159) if memkill else SSHResult([], [],[],0)
+            ),
+            "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70135": (
+                SSHResult([],["PBS: job killed: walltime"],[],159) if wallkill else SSHResult([], [],[],0)
+            )
+        }
+        self.responses_in = {
+            "qrerun": SSHResult([],[],[],0) if rerun else SSHResult([],[],[],159),
+            "qsub": SSHResult([],[],[],0) if qsub else SSHResult([],[],[],38)
+        }
 
     def execute(self,command):
-        if command == "qstat -f":
-            return SSHResult([], qstat_raw_example.split("\n"),[],0)
-        elif command == f"cat {PRIORITY_RERUN_FILE}":
-            return SSHResult([], ['{"1234":"/path/to/file1", "1235":"/path/to/file2"}\n'],[],0)
-        elif command.startswith("qrerun"):
-            return  SSHResult([],[],[],159)
-
+        if command in self.responses:
+            return self.responses[command]
+        for k,v in self.responses_in.items():
+            if k in command:
+                return v
+        return SSHResult([], [],["command not found."],1)
 
 def test_get_jobs():
     handler = DummyHandler()
@@ -140,3 +163,29 @@ def test_get_jobs():
         # Test attribute-style field access
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
+
+@pytest.mark.parametrize("valid",[
+    #pytest.param(False,marks=pytest.mark.xfail(reason="Unrecognised batch system")),
+    True])
+@pytest.mark.parametrize("jobs",[False,True])
+@pytest.mark.parametrize("tracked",[False,True])
+@pytest.mark.parametrize("rerun",[False,True])
+@pytest.mark.parametrize("memkill",[False,True])
+@pytest.mark.parametrize("wallkill",[False,True])
+@pytest.mark.parametrize("qsub",[False,True])
+def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill,qsub):
+    os.environ["SCHEDTOOLS_PROG"] = "rerun"
+    to_destroy.append(os.path.dirname(RERUN_TRACKED_CACHE))
+    handler = DummyHandler(valid=valid,jobs=jobs,tracked=tracked,rerun=rerun,memkill=memkill,wallkill=wallkill,qsub=qsub)
+    rerun_jobs(handler=handler,logger=logging.getLogger(__name__).addHandler(logging.NullHandler()))
+    cached = get_tracked_cache()
+    if tracked:
+        if memkill and (not qsub) and (not rerun):
+            # if qsub, id should not be in cached
+            assert "70134" in cached
+        if wallkill and (not qsub) and (not rerun):
+            # if qsub, id should not be in cached
+            assert "70135" in cached
+    if jobs:
+        assert "7013474" in cached
+        assert "7013475" in cached

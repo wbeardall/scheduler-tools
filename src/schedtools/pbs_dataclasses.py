@@ -58,7 +58,7 @@ class PBSJob(dict):
     
 class Queue:
     def __init__(self,jobs: List[PBSJob]):
-        self.jobs = {j.id:j for j in jobs}
+        self.jobs = {j.id:j for j in jobs if len(j)}
 
     def pop(self,job: Union[str, PBSJob]):
         if isinstance(job, PBSJob):
