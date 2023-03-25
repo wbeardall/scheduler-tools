@@ -36,7 +36,7 @@ class WorkloadManager(ABC):
         return self.get_jobs_from_handler(self.handler)
 
     @abstractstaticmethod
-    def get_jobs_from_handler(handler: ShellHandler):  # pragma: no cover
+    def get_jobs_from_handler(handler: ShellHandler):
         ...
 
     def submit_job(self, jobscript_path: str):
@@ -61,19 +61,19 @@ class WorkloadManager(ABC):
         return self.was_killed_walltime(job) or self.was_killed_mem(job)
 
     @abstractmethod
-    def was_killed_reason(self, job: PBSJob):  # pragma: no cover
+    def was_killed_reason(self, job: PBSJob):
         ...
 
     @abstractmethod
-    def was_killed_mem(self, job: PBSJob):  # pragma: no cover
+    def was_killed_mem(self, job: PBSJob):
         ...
 
     @abstractmethod
-    def was_killed_walltime(self, job: PBSJob):  # pragma: no cover
+    def was_killed_walltime(self, job: PBSJob):
         ...
 
     @abstractmethod
-    def rerun_job(self, job: PBSJob):  # pragma: no cover
+    def rerun_job(self, job: PBSJob):
         ...
 
 class UCL(WorkloadManager):
