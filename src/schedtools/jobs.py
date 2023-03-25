@@ -19,7 +19,7 @@ RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR,"rerun-tracked-cache.json")
 
 # Allow retry in case of traffic corruption
 @retry_on(json.decoder.JSONDecodeError, max_tries=5)
-def get_tracked_from_file(handler: ShellHandler):
+def get_tracked_from_cluster(handler: ShellHandler):
     f"""Get tracked job list from file
 
     Expects tracked jobs to be stored in `{RERUN_TRACKED_FILE}` (json-formatted)
@@ -27,6 +27,8 @@ def get_tracked_from_file(handler: ShellHandler):
     Args:
         handler: `ShellHandler` instance to use to query cluster
     """
+    if isinstance(handler, str):
+        handler = ShellHandler(handler)
     result = handler.execute(f"cat {RERUN_TRACKED_FILE}")
     if result.returncode or not len(result.stdout):
         return Queue([])
@@ -97,7 +99,7 @@ def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=9
     manager = get_workload_manager(handler, logger)
     queued = manager.get_jobs()
     
-    tracked = get_tracked_from_file(handler)
+    tracked = get_tracked_from_cluster(handler)
     
     tracked.update(get_tracked_cache())
     to_rerun = Queue([job for job in tracked if (job not in queued) and manager.was_killed(job)])
