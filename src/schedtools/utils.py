@@ -40,7 +40,10 @@ def connect_to_host(host_alias, get_password=False, **kwargs):
             hostname=host_config["hostname"],
             username=host_config["user"],
             port=int(host_config.get("port", 22)),
-            password=password
+            password=password,
+            # We already have the password, so don't look for keys or talk to the agent
+            allow_agent=False,
+            look_for_keys=False
         )
     if get_password:
         return password
