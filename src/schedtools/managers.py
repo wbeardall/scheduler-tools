@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod, abstractstaticmethod
 from functools import partialmethod
 from logging import Logger
 import re
-from typing import Union
+from typing import Any, Dict, Union
 
 from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
@@ -14,7 +14,7 @@ class WorkloadManager(ABC):
     manager_check_cmd = None
     submit_cmd = None
     delete_cmd = None
-    def __init__(self, handler: Union[ShellHandler, str], logger: Union[Logger, None] = None) -> None:
+    def __init__(self, handler: Union[ShellHandler, str, Dict[str, Any]], logger: Union[Logger, None] = None) -> None:
         if not isinstance(handler, ShellHandler):
             handler = ShellHandler(handler)
         if logger is None:

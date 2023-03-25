@@ -15,13 +15,17 @@ def connect_to_host(host_alias, get_password=False, **kwargs):
     Args:
         host_alias: Alias for host to connect to.
     """
-    ssh = paramiko.SSHConfig()
-    user_config_file = os.environ.get("SSH_CONFIG",os.path.expanduser("~/.ssh/config"))
-    if os.path.exists(user_config_file):
-        with open(user_config_file) as f:
-            ssh.parse(f)
+    if isinstance(host_alias,str):
+        ssh = paramiko.SSHConfig()
+        user_config_file = os.environ.get("SSH_CONFIG",os.path.expanduser("~/.ssh/config"))
+        if os.path.exists(user_config_file):
+            with open(user_config_file) as f:
+                ssh.parse(f)
 
-    host_config = ssh.lookup(host_alias)
+        host_config = ssh.lookup(host_alias)
+    else:
+        assert isinstance(host_alias,dict)
+        host_config = host_alias
     
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

@@ -1,7 +1,7 @@
 import json
 import os
 from logging import Logger
-from typing import Union
+from typing import Any, Dict, Union
 
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
@@ -27,7 +27,7 @@ def get_tracked_from_cluster(handler: ShellHandler):
     Args:
         handler: `ShellHandler` instance to use to query cluster
     """
-    if isinstance(handler, str):
+    if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler)
     result = handler.execute(f"cat {RERUN_TRACKED_FILE}")
     if result.returncode or not len(result.stdout):
@@ -44,7 +44,7 @@ def get_tracked_cache():
     return cached
 
 def delete_queued_duplicates(
-    handler: Union[ShellHandler, str], 
+    handler: Union[ShellHandler, str, Dict[str, Any]], 
     manager: Union[WorkloadManager,None] = None,
     logger: Union[Logger, None] = None,
     count_running: bool = False):
@@ -59,7 +59,7 @@ def delete_queued_duplicates(
         logger: Logger instance (defaults to `None`)
         count_running: Include running jobs when identifying duplicates
     """
-    if isinstance(handler, str):
+    if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler)
     if manager is None:
         manager = get_workload_manager(handler, logger or loggers.current)
@@ -80,7 +80,7 @@ def delete_queued_duplicates(
             pass
 
 
-def rerun_jobs(handler: Union[ShellHandler, str], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, 
+def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, 
                continue_on_rerun: bool= False, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     

@@ -1,11 +1,11 @@
-import json
 import logging
 import os
+import shutil
 
 import pytest
 
 from schedtools.core import PBSJob
-from schedtools.jobs import RERUN_TRACKED_FILE, RERUN_TRACKED_CACHE, rerun_jobs, get_tracked_cache
+from schedtools.jobs import RERUN_TRACKED_FILE, RERUN_TRACKED_CACHE, rerun_jobs, get_tracked_cache, get_tracked_from_cluster
 from schedtools.managers import PBS
 from schedtools.shell_handler import ShellHandler, SSHResult
 
@@ -165,6 +165,19 @@ def test_get_jobs():
         # Test attribute-style field access
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
+
+@pytest.mark.parametrize("tracked",[True,False])
+def test_get_tracked(to_destroy,tracked):
+    if tracked:
+        tracked_path = os.path.join(os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1])
+        to_destroy.append(tracked_path)
+        shutil.copyfile(os.path.join(os.path.dirname(__file__),"dummy_tracked.json"),tracked_path)
+    queue = get_tracked_from_cluster({"hostname":"localhost","user":None})
+    if tracked:
+        assert len(queue)==2
+    else:
+        assert len(queue)==0
+
 
 @pytest.mark.parametrize("valid",[
     #pytest.param(False,marks=pytest.mark.xfail(reason="Unrecognised batch system")),
