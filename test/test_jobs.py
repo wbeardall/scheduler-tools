@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from schedtools.pbs_dataclasses import PBSJob
+from schedtools.core import PBSJob
 from schedtools.jobs import RERUN_TRACKED_FILE, RERUN_TRACKED_CACHE, rerun_jobs, get_tracked_cache
 from schedtools.managers import PBS
 from schedtools.shell_handler import ShellHandler, SSHResult
@@ -122,7 +122,8 @@ with open(os.path.join(os.path.dirname(__file__),"dummy_tracked.json"),"r") as f
     dummy_tracked = f.readlines()
 
 class DummyHandler(ShellHandler):
-    def __init__(self,valid=True, jobs=True, tracked=True, rerun=True, memkill=True, wallkill=True,qsub=True):
+    def __init__(self,valid=True, jobs=True, tracked=True, rerun=True, memkill=True, wallkill=True,qsub=True,
+                 qdel=True):
         self.responses = {
             "qstat": SSHResult([], [],[],0) if valid else SSHResult([], [],[],1),
             "qstat -f": SSHResult([], dummy_queue.split("\n"),[],0) if jobs else SSHResult([], [],[],0),
@@ -136,7 +137,8 @@ class DummyHandler(ShellHandler):
         }
         self.responses_in = {
             "qrerun": SSHResult([],[],[],0) if rerun else SSHResult([],[],[],159),
-            "qsub": SSHResult([],[],[],0) if qsub else SSHResult([],[],[],38)
+            "qsub": SSHResult([],[],[],0) if qsub else SSHResult([],[],[],38),
+            "qdel": SSHResult([],[],[],0) if qdel else SSHResult([],[],[],1),
         }
 
     def execute(self,command):

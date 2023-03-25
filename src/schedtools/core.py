@@ -27,6 +27,10 @@ class PBSJob(dict):
     @property
     def id(self):
         return self["id"]
+    
+    @property
+    def name(self):
+        return self["Job_Name"]
         
     @property
     def jobscript_path(self):
@@ -57,7 +61,7 @@ class PBSJob(dict):
         return self.status=="queued"
     
 class Queue:
-    def __init__(self,jobs: List[PBSJob]):
+    def __init__(self,jobs: List[PBSJob] = []):
         self.jobs = {j.id:j for j in jobs if len(j)}
 
     def pop(self,job: Union[str, PBSJob]):

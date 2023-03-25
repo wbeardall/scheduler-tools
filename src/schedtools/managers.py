@@ -4,7 +4,7 @@ from logging import Logger
 import re
 from typing import Union
 
-from schedtools.pbs_dataclasses import PBSJob, Queue
+from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
@@ -36,7 +36,7 @@ class WorkloadManager(ABC):
         return self.get_jobs_from_handler(self.handler)
 
     @abstractstaticmethod
-    def get_jobs_from_handler(handler: ShellHandler):
+    def get_jobs_from_handler(handler: ShellHandler):  # pragma: no cover
         ...
 
     def submit_job(self, jobscript_path: str):
@@ -61,19 +61,19 @@ class WorkloadManager(ABC):
         return self.was_killed_walltime(job) or self.was_killed_mem(job)
 
     @abstractmethod
-    def was_killed_reason(self, job: PBSJob):
+    def was_killed_reason(self, job: PBSJob):  # pragma: no cover
         ...
 
     @abstractmethod
-    def was_killed_mem(self, job: PBSJob):
+    def was_killed_mem(self, job: PBSJob):  # pragma: no cover
         ...
 
     @abstractmethod
-    def was_killed_walltime(self, job: PBSJob):
+    def was_killed_walltime(self, job: PBSJob):  # pragma: no cover
         ...
 
     @abstractmethod
-    def rerun_job(self, job: PBSJob):
+    def rerun_job(self, job: PBSJob):  # pragma: no cover
         ...
 
 class UCL(WorkloadManager):
@@ -145,7 +145,7 @@ class PBS(WorkloadManager):
                 pass
             raise JobSubmissionError(msg)
         else:
-            self.logger.info(f"Rerunning job {job.id}")
+            self.logger.info(f"Rerunning job {job.id} ({job.name})")
 
     def was_killed_reason(self, job: PBSJob, reason):
         result = self.handler.execute(f"tail {job.error_path}")

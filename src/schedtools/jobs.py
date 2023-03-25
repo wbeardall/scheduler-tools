@@ -6,7 +6,7 @@ from typing import Union
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.managers import get_workload_manager, WorkloadManager
-from schedtools.pbs_dataclasses import PBSJob, Queue
+from schedtools.core import PBSJob, Queue
 from schedtools.shell_handler import ShellHandler
 from schedtools.utils import systemd_service
 
@@ -16,35 +16,6 @@ if systemd_service():
 else:
     CACHE_DIR = os.path.join(os.path.expanduser("~"),".rerun")
 RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR,"rerun-tracked-cache.json")
-
-def get_job_percentage(handler: ShellHandler):
-    """Get percentage completion of current running / queued jobs.
-    
-    Queries the cluster using `qstat -p`, and so does not return full job information.
-    Jobs are returned as a dict of job_id: percentage pairs
-
-    Args:
-        handler: `ShellHandler` instance to use to query cluster
-    """
-    result = handler.execute("qstat -p")
-    if result.returncode:
-        raise RuntimeError(f"qstat failed with returncode {result.returncode}")
-    data = result.stdout
-    # Trim any junk from the top of the file
-    for start_line in range(len(data)):
-        if tuple(data[0].strip().split())==('Job', 'id', 'Name', 'User', '%', 'done', 'S', 'Queue'):
-            break
-    data = data[start_line:]
-
-    running_jobs = {}
-    for i in range(2, len(data)):
-        line = data[i].strip().split()
-        if len(line):
-            id_ = line[0][:-4]
-            pc = line[-3]
-            if pc != '(null)':
-                running_jobs[id_] = float(pc.replace("%", ""))
-    return running_jobs
 
 def get_tracked_from_file(handler: ShellHandler):
     f"""Get tracked job list from file
@@ -65,7 +36,7 @@ def get_tracked_cache():
         with open(RERUN_TRACKED_CACHE, "r") as f:
             cached = Queue([PBSJob(job) for job in json.load(f)])
     else:
-        cached = Queue([])
+        cached = Queue()
     return cached
 
 def delete_queued_duplicates(
@@ -74,6 +45,9 @@ def delete_queued_duplicates(
     logger: Union[Logger, None] = None,
     count_running: bool = False):
     """Delete duplicates of queued jobs.
+
+    This function determines job identity by the jobscript path, because job name is
+    not guaranteed unique.
     
     Args:
         handler: Shell handler instance, or SSH host alias
@@ -86,18 +60,18 @@ def delete_queued_duplicates(
     if manager is None:
         manager = get_workload_manager(handler, logger or loggers.current)
     jobs = manager.get_jobs()
-    queued_names = []
-    duplicates = []
+    waiting_scripts = []
+    duplicates = Queue()
     for job in jobs:
         if not count_running and not job.is_queued:
             continue
-        if job["Job_Name"] in queued_names:
+        if job.jobscript_path in waiting_scripts:
             duplicates.append(job)
         else:
-            queued_names.append(job["Job_Name"])
+            waiting_scripts.append(job.jobscript_path)
     for job in duplicates:
         try:
-            manager.delete_job(job.id)
+            manager.delete_job(job)
         except JobDeletionError:
             pass
 
