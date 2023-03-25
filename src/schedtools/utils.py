@@ -1,7 +1,11 @@
+from collections.abc import Iterable
+from functools import wraps
 import os
 from getpass import getpass
 import re
 import subprocess
+import traceback
+import warnings
 
 import paramiko
 
@@ -92,3 +96,57 @@ class RevDict(dict):
     @property
     def rev(self):
         return RevDict({v:k for k,v in self.items()})
+    
+class RetryError(Exception):
+    """ """
+
+    pass
+
+
+def retry_on(exception, max_tries=5, allow=None):
+    """Decorator for retrying functions under specific exception conditions.
+
+    `allow` can be passed a callable to further constrain allowed conditions.
+    Logic is as follows: when `allow` is provided, exceptions have to both match `exception` and
+    `allow` to continue.
+
+    Args:
+        exception: `Exception` or tuple of exceptions to retry upon
+        max_tries: Max retry attempts. Defaults to 5.
+        allow: Optional callable to further specify retry conditions. Defaults to None.
+
+    """
+    if isinstance(exception, Iterable):
+        if not all([issubclass(el, Exception) for el in exception]):
+            raise TypeError("Iterables must only contain Exception subclasses")
+        exception = tuple(exception)
+    elif not issubclass(exception, Exception):
+        raise TypeError("exception must be Exception or Iterable of Exceptions")
+
+    if allow is None:
+        allow = lambda x: True
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for i in range(max_tries):
+                try:
+                    return func(*args, **kwargs)
+                except exception as e:
+                    if not allow(e):
+                        raise e
+                    if "DISABLE_RETRY" in os.environ:
+                        raise e
+                    if i == max_tries - 1:
+                        raise RetryError(
+                            f"Maximum retry count ({max_tries}) reached."
+                        ) from e
+                    warnings.warn(
+                        "{}\n{} failed. Retrying... ({}/{})".format(
+                            e, func, i + 1, max_tries
+                        )
+                    )
+                    traceback.print_exc()
+
+        return wrapper
+
+    return decorator

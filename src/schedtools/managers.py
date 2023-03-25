@@ -8,6 +8,7 @@ from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
+from schedtools.utils import retry_on
 
 class WorkloadManager(ABC):
     manager_check_cmd = None
@@ -22,6 +23,7 @@ class WorkloadManager(ABC):
         self.logger = logger
     
     @classmethod
+    @retry_on(RecursionError, max_tries=2)
     def is_valid(cls,handler: ShellHandler):
         result = handler.execute(cls.manager_check_cmd)
         if result.returncode == 0:

@@ -8,7 +8,7 @@ from schedtools.log import loggers
 from schedtools.managers import get_workload_manager, WorkloadManager
 from schedtools.core import PBSJob, Queue
 from schedtools.shell_handler import ShellHandler
-from schedtools.utils import systemd_service
+from schedtools.utils import systemd_service, retry_on
 
 RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
 if systemd_service():
@@ -17,6 +17,8 @@ else:
     CACHE_DIR = os.path.join(os.path.expanduser("~"),".rerun")
 RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR,"rerun-tracked-cache.json")
 
+# Allow retry in case of traffic corruption
+@retry_on(json.decoder.JSONDecodeError, max_tries=5)
 def get_tracked_from_file(handler: ShellHandler):
     f"""Get tracked job list from file
 
