@@ -155,9 +155,6 @@ For detailed information on the CLI for the `rerun` utility, run the following c
 storage-tracker -h
 ```
 
-If you have manager-level privileges on the cluster, usage is straightforward, as the program can simply call the `qrerun`
-command with the IDs of any jobs that are at risk of timing out. 
-
 
 #### Usage
 
