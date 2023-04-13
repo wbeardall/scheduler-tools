@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 
@@ -5,7 +6,20 @@ def get_service_file(name):
     name = name.lower().replace(' ', '-')
     return f"/etc/systemd/system/{name}.service"
 
+def copy_config():
+    config_dir = ".schedtools"
+    user_config = os.path.join(os.path.expanduser("~"), config_dir)
+    root_config = os.path.join("/etc",config_dir)
+    subprocess.call(["sudo", "mkdir", "-p", root_config])
+    if os.path.exists(user_config):
+        for file in os.listdir(user_config):
+            subprocess.call(["sudo", "cp", "-n", os.path.join(user_config, file), root_config])
+    # Set the config directory to only be accessible to root
+    subprocess.call(["sudo", "chown", "-R", "root:root", root_config])
+    subprocess.call(["sudo", "chmod", "-R", "600", root_config])
+
 def make_service(name: str, command: str, environment: dict = {}):
+    copy_config()
     if len(environment):
         env_str = "\n".join([f'{k}="{v}"' for k,v in environment.items()]) + "\n"
         pass_env = "PassEnvironment=" + " ".join(environment) + "\n"
@@ -37,7 +51,7 @@ WantedBy=multi-user.target
 
     # Set the conf file to only be accessible to root
     subprocess.call(["sudo", "chown", "root:root", service_conf])
-    subprocess.call(["sudo", "chmod", "700", service_conf])
+    subprocess.call(["sudo", "chmod", "600", service_conf])
 
     subprocess.call(["sudo", "systemctl", "daemon-reload"])
     subprocess.call(["sudo", "systemctl", "enable", service_id])

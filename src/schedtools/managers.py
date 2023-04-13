@@ -21,6 +21,10 @@ class WorkloadManager(ABC):
             logger = loggers.current
         self.handler = handler
         self.logger = logger
+
+    @abstractmethod
+    def get_storage_stats(self):
+        ...
     
     @classmethod
     @retry_on(RecursionError, max_tries=2)
@@ -90,6 +94,28 @@ class PBS(WorkloadManager):
     submit_cmd = "qsub"
     delete_cmd = "qdel"
     qrerun_allowed = True
+
+    def get_storage_stats(self):
+        storage_lines = self.handler.login_message[-4:]
+        # NOTE: we don't currently report ephemeral stats
+        stats = {}
+        section_name = None
+        section = {}
+        for line in storage_lines:
+            stat_name, tail = line.strip().split(":")
+            if len(stat_name.split())>1:
+                if section_name is not None:
+                    stats[section_name] = section
+                    section = {}
+                section_name, stat_name = stat_name.split()
+            section[stat_name] = dict(
+                used=re.findall("[0-9]+\.{0,1}[0-9]*[kMGTP](?=B{0,1} of)", tail)[0],
+                total=re.findall("(?<=of )[0-9]+\.{0,1}[0-9]*[kMGTP]", tail)[0],
+                percent_used=float(re.findall("(?<=\()[0-9]+\.{0,1}[0-9]*(?=\%\))", tail)[0])
+            )
+        return stats
+            
+
 
     @staticmethod
     def get_jobs_from_handler(handler: ShellHandler):

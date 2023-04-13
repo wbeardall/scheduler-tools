@@ -80,7 +80,7 @@ def delete_queued_duplicates(
             pass
 
 
-def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Union[int, float]=95, logger: Union[Logger, None]=None, 
+def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Union[int, float]=90, logger: Union[Logger, None]=None, 
                continue_on_rerun: bool= False, **kwargs):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
     

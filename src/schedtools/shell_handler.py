@@ -18,7 +18,7 @@ class ShellHandler:
         self.stdin = channel.makefile('wb')
         self.stdout = channel.makefile('r')
         # Execute a dummy command to clear any login-related shell junk
-        self.execute("echo")
+        self.login_message = self.execute("echo").stdout[:-3]
 
     def __del__(self):
         try:
@@ -37,6 +37,8 @@ class ShellHandler:
                     execute('finger')
                     execute('cd folder_name')
         """
+        if not len(cmd):
+            raise ValueError("Cannot execute empty command.")
         cmd = cmd.strip('\n')
         self.stdin.write(cmd + '\n')
         finish = 'end of stdOUT buffer. finished with exit status'

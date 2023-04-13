@@ -85,6 +85,13 @@ def journald_active():
 
 def systemd_service():
     return "SYSTEMD_SERVICE" in os.environ
+
+def config_dir():
+    if systemd_service():
+        base = "/etc"
+    else:
+        base = os.path.expanduser("~")
+    return os.path.join(base, ".schedtools")
     
 class Singleton(type):
     """Singleton metaclass.

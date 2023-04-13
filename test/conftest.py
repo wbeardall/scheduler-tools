@@ -3,6 +3,8 @@ import shutil
 
 import pytest
 
+from schedtools.utils import config_dir
+
 @pytest.fixture(scope="function")
 def to_destroy():
     to_destroy = []
@@ -19,3 +21,15 @@ def to_destroy():
         if os.path.exists(dir_):
             if not len(os.listdir(dir_)):
                 os.rmdir(dir_)
+
+@pytest.fixture(autouse=True)
+def hide_smtp_creds(request):
+    if 'nohidecreds' in request.keywords:
+        return
+    cred_path = os.path.join(config_dir(),"smtp.json")
+    if os.path.exists(cred_path):
+        os.rename(cred_path, cred_path + ".old")
+        yield
+        os.rename(cred_path + ".old", cred_path)
+    else:
+        return

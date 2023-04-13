@@ -143,6 +143,22 @@ Run arbitrary commands on a remote machine. This is a simple quality-of-life uti
 having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the 
 `stdout`, `stderr` and exit status on the remote machine.
 
+### `storage-tracker`
+
+Periodically check the storage utilisation on a cluster, and notify the user via email if the quota is close to running out.
+
+#### Usage
+
+For detailed information on the CLI for the `rerun` utility, run the following command:
+
+```
+storage-tracker -h
+```
+
+If you have manager-level privileges on the cluster, usage is straightforward, as the program can simply call the `qrerun`
+command with the IDs of any jobs that are at risk of timing out. 
+
+
 #### Usage
 
 This utility does not require any additional command modification or quotations around the command to be run.
@@ -265,3 +281,31 @@ journalctl -fu rerun.service
 ```
 
 The `-f` flag in the above only shows the most recent logs, rather than the whole log stack.
+
+### Setting Up Email Notifications 
+
+Schedtools supports email-based notifications for high-priority errors. 
+
+#### Setting up SMTP
+
+In order to receive email notifications, you need an email account (we recommend a throwaway account with a unique password for security) which supports SMTP, from which `schedtools` will send notifications to you. Outlook accounts are good for this, but Gmail accounts will no longer work out of the box due to Google's 2022 change to their credentials. However, if you do want to use a Gmail account for this, you should still be able to get it to work by enabling 2-step verification and using [app passwords](https://support.google.com/mail/answer/185833?hl=en).
+
+These credentials are stored in `~/.schedtools/smtp.json`, and copied to a root-only file if needed by a `schedtools` program which is run as a service. Naturally, you should only use this on machines where you trust everyone that has root access (or ideally, where nobody else has root access).
+
+We provide a prompt-based credentials script, which can be called after `schedtools` installation with
+
+```
+create-smtp-credentials
+```
+
+Alternatively, you can manually create the `JSON` file, and format it as shown below. The `destination_address` field is optional; if omitted, emails will both send from and be delivered to the `sender_address`.
+
+```
+{
+  "server": "smtp.office365.com", 
+  "port": 587, 
+  "sender_address": "throwaway-email@domain.com", 
+  "password": "a-secure-password", 
+  "destination_address": "my-email@domain.com"
+}
+```
