@@ -33,4 +33,6 @@ jobs:
         sudo apt-get install libsystemd-dev
         export LOGNAME=$(whoami)
         ssh-agent -s
+        ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
+        ssh-add ~/.ssh/id_rsa
         tox

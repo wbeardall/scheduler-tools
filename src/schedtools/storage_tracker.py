@@ -37,7 +37,6 @@ def check_storage(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: 
                 logger.error(f"{element} usage in partition '{partition}' at {data['percent_used']:.1f}% capacity ({data['used']} / {data['total']})")
 
 
-
 def storage_tracker(): # pragma: no cover
     """Utility for tracking storage usage on a cluster, and sending email notifications when the quota is almost filled."""
     os.environ["SCHEDTOOLS_PROG"] = "storage-tracker"
