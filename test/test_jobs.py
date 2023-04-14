@@ -13,7 +13,9 @@ if __package__ is None or __package__ == '':
 else:
     from .dummy_handler import DummyHandler
 
+
 def test_get_jobs():
+    raise ValueError("test_get_jobs")
     handler = DummyHandler()
     jobs = PBS.get_jobs_from_handler(handler)
     attrs = [
@@ -32,6 +34,7 @@ def test_get_jobs():
 
 @pytest.mark.parametrize("tracked",[True,False])
 def test_get_tracked(to_destroy,tracked):
+    raise ValueError("test_get_tracked")
     if tracked:
         tracked_path = os.path.join(os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1])
         to_destroy.append(tracked_path)
@@ -53,6 +56,7 @@ def test_get_tracked(to_destroy,tracked):
 @pytest.mark.parametrize("wallkill",[False,True])
 @pytest.mark.parametrize("qsub",[False,True])
 def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill,qsub):
+    raise ValueError("test_rerun")
     os.environ["SCHEDTOOLS_PROG"] = "rerun"
     to_destroy.append(os.path.dirname(RERUN_TRACKED_CACHE))
     handler = DummyHandler(valid=valid,jobs=jobs,tracked=tracked,rerun=rerun,memkill=memkill,wallkill=wallkill,qsub=qsub)
