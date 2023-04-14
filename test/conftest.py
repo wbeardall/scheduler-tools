@@ -25,11 +25,12 @@ def to_destroy():
 @pytest.fixture(autouse=True)
 def hide_smtp_creds(request):
     if 'nohidecreds' in request.keywords:
-        return
-    cred_path = os.path.join(config_dir(),"smtp.json")
-    if os.path.exists(cred_path):
-        os.rename(cred_path, cred_path + ".old")
         yield
-        os.rename(cred_path + ".old", cred_path)
     else:
-        return
+        cred_path = os.path.join(config_dir(),"smtp.json")
+        if os.path.exists(cred_path):
+            os.rename(cred_path, cred_path + ".old")
+            yield
+            os.rename(cred_path + ".old", cred_path)
+        else:
+            yield
