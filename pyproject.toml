@@ -10,6 +10,9 @@ syntax = "google"
 
 [tool.pytest.ini_options]
 addopts = "--cov=schedtools"
+markers = [
+    "nohidecreds: Do not hide SMTP credentials (if they exist) for this test.",
+]
 testpaths = [
     "test",
 ]
