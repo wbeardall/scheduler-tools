@@ -32,6 +32,7 @@ def test_get_jobs():
 
 @pytest.mark.parametrize("tracked",[True,False])
 def test_get_tracked(to_destroy,tracked):
+    raise ValueError("get_tracked")
     if tracked:
         tracked_path = os.path.join(os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1])
         to_destroy.append(tracked_path)
