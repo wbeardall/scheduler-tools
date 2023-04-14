@@ -20,7 +20,6 @@ class DummyLogger:
 
 @pytest.mark.parametrize("data_threshold", [False, True])
 def test_check_storage(data_threshold):
-    raise ValueError("check_storage")
     handler = DummyHandler(data_threshold=data_threshold)
     logger = DummyLogger()
     check_storage(handler, 80, logger = logger)
