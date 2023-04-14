@@ -22,15 +22,6 @@ def to_destroy():
             if not len(os.listdir(dir_)):
                 os.rmdir(dir_)
 
-@pytest.fixture(scope="session", autouse=True)
-def set_test_logname():
-    if "LOGNAME" not in os.environ:
-        os.environ["LOGNAME"] = "test-user"
-        yield
-        del(os.environ["LOGNAME"])
-    else:
-        yield
-
 @pytest.fixture(autouse=True)
 def hide_smtp_creds(request):
     if 'nohidecreds' in request.keywords:

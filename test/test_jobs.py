@@ -30,7 +30,10 @@ def test_get_jobs():
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
 
-
+@pytest.mark.skipif(
+    condition=os.environ.get("LOGNAME","runner")=="runner",
+    reason="Executing tests on GHA, and localhost SSH does not behave well in this environment."
+)
 @pytest.mark.parametrize("tracked",[True,False])
 def test_get_tracked(to_destroy,tracked):
     if tracked:
