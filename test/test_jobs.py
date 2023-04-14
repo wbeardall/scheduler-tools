@@ -30,13 +30,17 @@ def test_get_jobs():
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
 
+@pytest.mark.skipif(
+    condition=os.environ.get("LOGNAME","runner")=="runner",
+    reason="Executing tests on GHA, and localhost SSH does not behave well in this environment."
+)
 @pytest.mark.parametrize("tracked",[True,False])
 def test_get_tracked(to_destroy,tracked):
     if tracked:
         tracked_path = os.path.join(os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1])
         to_destroy.append(tracked_path)
         shutil.copyfile(os.path.join(os.path.dirname(__file__),"dummy_tracked.json"),tracked_path)
-    queue = get_tracked_from_cluster({"hostname":"localhost","user":None})
+    queue = get_tracked_from_cluster({"hostname":"localhost","user":os.environ["LOGNAME"]})
     if tracked:
         assert len(queue)==2
     else:
