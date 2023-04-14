@@ -53,6 +53,7 @@ def test_get_tracked(to_destroy,tracked):
 @pytest.mark.parametrize("wallkill",[False,True])
 @pytest.mark.parametrize("qsub",[False,True])
 def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill,qsub):
+    raise ValueError("test_rerun")
     os.environ["SCHEDTOOLS_PROG"] = "rerun"
     to_destroy.append(os.path.dirname(RERUN_TRACKED_CACHE))
     handler = DummyHandler(valid=valid,jobs=jobs,tracked=tracked,rerun=rerun,memkill=memkill,wallkill=wallkill,qsub=qsub)
