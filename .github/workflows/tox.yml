@@ -31,4 +31,5 @@ jobs:
     - name: Test with tox
       run: |
         sudo apt-get install libsystemd-dev
+        export LOGNAME=$(whoami)
         tox
