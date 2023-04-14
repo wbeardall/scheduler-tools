@@ -43,6 +43,135 @@ pip install -e .
 
 ## Programs
 
+### `check-status`
+
+Check the status of `schedtools` utilities that have been registered as services with `systemd`.
+This command can be used to check locally-registered utilities, or those on a remote machine by specifying the 
+hostname when calling the program. In the future, this might be expanded to include status checks for 
+daemonized `schedtools` utilities.
+
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `check-status` utility, run the following command:
+
+```
+check-status -h
+```
+
+### `clear-logs`
+
+Clear old cluster log files with job IDs below a certain threshold. This program is designed to be run on a
+login shell on the cluster upon which it is clearing logs, not run remotely.
+
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `clear-logs` utility, run the following command:
+
+```
+clear-logs -h
+```
+
+### `convert-jobscripts`
+
+Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 
+
+**Note** In order for converted jobscripts to work on the other cluster, any paths in the jobscript must be consistent 
+across both file structures. In order to achieve this, it is sufficient to ensure that:
+
+1. All paths in the jobscript are relative to `$HOME`
+2. The directory paths are consistent relative to `$HOME` across clusters. 
+
+As an example, `$HOME/my-project/outputs/out.log` would be consistent, assuming `my-project` is located in `$HOME` on both
+clusters.
+
+**Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a 
+`-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `convert-jobscripts` utility, run the following command:
+
+```
+convert-jobscripts -h
+```
+
+### `create-smtp-credentials`
+
+A prompt-based interface for setting up `SMTP`-based email notifications for logs and the [`storage-tracker`](#storage-tracker) utility.
+
+#### Usage
+
+```
+create-smtp-credentials
+```
+
+### `delete-duplicate-jobs`
+
+Delete any duplicated job submissions on a cluster.
+
+#### Usage
+
+For detailed information on the CLI for the `delete-duplicate-jobs` utility, run the following command:
+
+```
+delete-duplicate-jobs -h
+```
+
+### `schedtools-help`
+
+This utility simply prints the repository `README.md` to your terminal for easy access to the documentation.
+
+#### Usage
+
+```
+schedtools-help
+```
+
+### `remote-command`
+
+Run arbitrary commands on a remote machine. This is a simple quality-of-life utility that prevents you
+having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the 
+`stdout`, `stderr` and exit status on the remote machine.
+
+#### Usage
+
+This utility does not require any additional command modification or quotations around the command to be run.
+Simply prepend any command you'd usually run with
+
+```
+remote-command hostname
+```
+
+For example,
+
+```
+remote-command hostname ls "path/to/my directory"
+```
+
+For detailed information on the CLI for the `remote-command` utility, run the following command:
+
+```
+remote-command -h
+```
+
+### `remove-service`
+
+Remove `schedtools` utilities that have been registered as services with `systemd`.
+
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+
+#### Usage
+
+For detailed information on the CLI for the `remove-service` utility, run the following command:
+
+```
+remove-service -h
+```
+
 ### `rerun`
 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
@@ -70,79 +199,6 @@ PBS job information (call `qstat -f` to see what this datastructure looks like).
 
     **Note** You can use your ephemeral storage for these except in the case of extremely long-running jobs
 
-### `delete-duplicate-jobs`
-
-Delete any duplicated job submissions on a cluster.
-
-#### Usage
-
-For detailed information on the CLI for the `delete-duplicate-jobs` utility, run the following command:
-
-```
-delete-duplicate-jobs -h
-```
-
-### `convert-jobscripts`
-
-Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 
-
-**Note** In order for converted jobscripts to work on the other cluster, any paths in the jobscript must be consistent 
-across both file structures. In order to achieve this, it is sufficient to ensure that:
-
-1. All paths in the jobscript are relative to `$HOME`
-2. The directory paths are consistent relative to `$HOME` across clusters. 
-
-As an example, `$HOME/my-project/outputs/out.log` would be consistent, assuming `my-project` is located in `$HOME` on both
-clusters.
-
-**Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a 
-`-s` flag. 
-
-#### Usage
-
-For detailed information on the CLI for the `convert-jobscripts` utility, run the following command:
-
-```
-convert-jobscripts -h
-```
-
-### `check-status`
-
-Check the status of `schedtools` utilities that have been registered as services with `systemd`.
-This command can be used to check locally-registered utilities, or those on a remote machine by specifying the 
-hostname when calling the program. In the future, this might be expanded to include status checks for 
-daemonized `schedtools` utilities.
-
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
-
-#### Usage
-
-For detailed information on the CLI for the `check-status` utility, run the following command:
-
-```
-check-status -h
-```
-
-### `remove-service`
-
-Remove `schedtools` utilities that have been registered as services with `systemd`.
-
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
-
-#### Usage
-
-For detailed information on the CLI for the `remove-service` utility, run the following command:
-
-```
-remove-service -h
-```
-
-### `remote-command`
-
-Run arbitrary commands on a remote machine. This is a simple quality-of-life utility that prevents you
-having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the 
-`stdout`, `stderr` and exit status on the remote machine.
-
 ### `storage-tracker`
 
 Periodically check the storage utilisation on a cluster, and notify the user via email if the quota is close to running out.
@@ -153,28 +209,6 @@ For detailed information on the CLI for the `rerun` utility, run the following c
 
 ```
 storage-tracker -h
-```
-
-
-#### Usage
-
-This utility does not require any additional command modification or quotations around the command to be run.
-Simply prepend any command you'd usually run with
-
-```
-remote-command hostname
-```
-
-For example,
-
-```
-remote-command hostname ls "path/to/my directory"
-```
-
-For detailed information on the CLI for the `remote-command` utility, run the following command:
-
-```
-remote-command -h
 ```
 
 ## Package Usage
@@ -289,7 +323,7 @@ In order to receive email notifications, you need an email account (we recommend
 
 These credentials are stored in `~/.schedtools/smtp.json`, and copied to a root-only file if needed by a `schedtools` program which is run as a service. Naturally, you should only use this on machines where you trust everyone that has root access (or ideally, where nobody else has root access).
 
-We provide a prompt-based credentials script, which can be called after `schedtools` installation with
+We provide a [prompt-based credentials script](#create-smtp-credentials), which can be called after `schedtools` installation with
 
 ```
 create-smtp-credentials

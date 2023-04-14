@@ -38,7 +38,7 @@ def check_storage(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: 
 
 
 
-def storage_tracker():
+def storage_tracker(): # pragma: no cover
     """Utility for tracking storage usage on a cluster, and sending email notifications when the quota is almost filled."""
     os.environ["SCHEDTOOLS_PROG"] = "storage-tracker"
     parser = argparse.ArgumentParser(description=storage_tracker.__doc__)
