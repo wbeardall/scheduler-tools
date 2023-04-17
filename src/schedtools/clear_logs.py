@@ -3,7 +3,7 @@ import os
 
 import regex as re # We need expanded regex functionality for the `\K` (keep) regex char
 
-def clear_cluster_logs(path: str, up_to: int, pattern: str = "pbs", recursive: bool=False,  force: bool = False):
+def clear_cluster_logs(path: str, up_to: int, pattern: str = "pbs", recursive: int=False,  force: bool = False):
     """Clear old cluster logs (stdout and stderr streams captured by the batch management system).
 
     Args:
@@ -11,7 +11,8 @@ def clear_cluster_logs(path: str, up_to: int, pattern: str = "pbs", recursive: b
         up_to: Job id up to which to remove matching cluster logs (non-inclusive).
         pattern: "pbs", "slurm", or arbitrary regex pattern. If regex is used, it must match the numeric job id of
             the cluster logs. Defaults to "pbs".
-        recursive: Recurse into directories. Defaults to False.
+        recursive: Recurse into directories. Positive numbers specify a max recursion count. Pass a negative number
+            to recurse down the entire tree. Defaults to False.
         force: Remove cluster logs without prompting for user confirmation. Defaults to False.
     """
     assert os.path.exists(path) and os.path.isdir(path), "`path` must be a directory"
@@ -47,7 +48,7 @@ def clear_logs():
                         "If no recursion depth is provided, and `-r` is specified, the program will recurse down to "
                         "the bottom of the directory tree.")
     parser.add_argument("-f","--force", action="store_true",
-                        help="Remove log files without prompting the user first. CAUTION: using this option with a"
+                        help="Remove log files without prompting the user first. CAUTION: using this option with a "
                         "regex pattern can silently remove arbitrary files.")
     args = parser.parse_args()
     clear_cluster_logs(args.path, args.up_to, args.pattern, args.recursive, args.force)
