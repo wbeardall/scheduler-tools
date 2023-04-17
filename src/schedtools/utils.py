@@ -38,7 +38,7 @@ def connect_to_host(host_alias, get_password=False, **kwargs):
             **kwargs
         )
         password = None
-    except paramiko.ssh_exception.PasswordRequiredException:
+    except (paramiko.ssh_exception.PasswordRequiredException, paramiko.ssh_exception.AuthenticationException):
         password = getpass(prompt="Password for {}@{}: ".format(host_config["user"], host_config["hostname"]))
         ssh_client.connect(
             hostname=host_config["hostname"],
