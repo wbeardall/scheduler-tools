@@ -54,10 +54,10 @@ def delete_queued_duplicates(
     not guaranteed unique.
     
     Args:
-        handler: Shell handler instance, or SSH host alias
-        manager: Workload manager instance (defaults to `None`)
-        logger: Logger instance (defaults to `None`)
-        count_running: Include running jobs when identifying duplicates
+        handler: Shell handler instance, or SSH host alias or host config dictionary
+        manager: Workload manager instance. Defaults to None.
+        logger: Logger instance. Defaults to None.
+        count_running: Include running jobs when identifying duplicates. Defaults to False.
     """
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler)
@@ -88,47 +88,54 @@ def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Uni
     without needing them stored anywhere.
 
     Args:
-
+        handler: Shell handler instance, or SSH host alias or host config dictionary
+        threshold: Job threshold percentage above which to rerun jobs. Defaults to 90.
+        logger: Logger instance. Defaults to None.
+        continue_on_rerun: Whether to continue or cancel a job upon requeuing. Defaults to False.
     """
     if logger is None:
         logger = loggers.current
-    logger.info("Executing rerun.")
-    if not isinstance(handler, ShellHandler):
-        handler = ShellHandler(handler, **kwargs)
+    try:
+        logger.info("Executing rerun.")
+        if not isinstance(handler, ShellHandler):
+            handler = ShellHandler(handler, **kwargs)
 
-    manager = get_workload_manager(handler, logger)
-    queued = manager.get_jobs()
-    
-    tracked = get_tracked_from_cluster(handler)
-    
-    tracked.update(get_tracked_cache())
-    to_rerun = Queue([job for job in tracked if (job not in queued) and manager.was_killed(job)])
-    to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
-    # Update list of tracked jobs
-    tracked.update(queued)
+        manager = get_workload_manager(handler, logger)
+        queued = manager.get_jobs()
+        
+        tracked = get_tracked_from_cluster(handler)
+        
+        tracked.update(get_tracked_cache())
+        to_rerun = Queue([job for job in tracked if (job not in queued) and manager.was_killed(job)])
+        to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
+        # Update list of tracked jobs
+        tracked.update(queued)
 
-    logger.info(f"{len(to_rerun)} jobs to rerun ({len(queued)} in queue).")
+        logger.info(f"{len(to_rerun)} jobs to rerun ({len(queued)} in queue).")
 
-    for job in to_rerun:
-        try: 
-            manager.rerun_job(job)
-            # Can untrack the job
-            tracked.pop(job)
-            if job in queued and not continue_on_rerun:
-                manager.delete_job(job)
-        except JobSubmissionError:
-            pass
-                
-    # Update the tracked job list
-    tracked_json = json.dumps([job for job in tracked])
-    result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
-    if result.returncode:
-        logger.info(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(RERUN_TRACKED_CACHE,"w") as f:
-            f.write(tracked_json)
-        logger.info(f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution.")
-    else:
-        # Can safely remove the cache
-        if os.path.exists(RERUN_TRACKED_CACHE):
-            os.remove(RERUN_TRACKED_CACHE)
+        for job in to_rerun:
+            try: 
+                manager.rerun_job(job)
+                # Can untrack the job
+                tracked.pop(job)
+                if job in queued and not continue_on_rerun:
+                    manager.delete_job(job)
+            except JobSubmissionError:
+                pass
+                    
+        # Update the tracked job list
+        tracked_json = json.dumps([job for job in tracked])
+        result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
+        if result.returncode:
+            logger.info(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(RERUN_TRACKED_CACHE,"w") as f:
+                f.write(tracked_json)
+            logger.info(f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution.")
+        else:
+            # Can safely remove the cache
+            if os.path.exists(RERUN_TRACKED_CACHE):
+                os.remove(RERUN_TRACKED_CACHE)
+    except Exception as e:
+        logger.exception(e)
+        raise e

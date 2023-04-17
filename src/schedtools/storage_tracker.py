@@ -22,20 +22,28 @@ def check_storage(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: 
     
     kwargs are provided to pass e.g. passwords to the created handler instance 
     without needing them stored anywhere.
+
+    Args:
+        handler: Shell handler instance, or SSH host alias or host config dictionary
+        threshold: Threshold above which to trigger alerts. Defaults to 85.
+        logger: Logger instance. Defaults to None.
     """
     if logger is None:
         logger = loggers.current
-    logger.info("Checking storage.")
-    if not isinstance(handler, ShellHandler):
-        handler = ShellHandler(handler, **kwargs)
+    try:
+        logger.info("Checking storage.")
+        if not isinstance(handler, ShellHandler):
+            handler = ShellHandler(handler, **kwargs)
 
-    manager = get_workload_manager(handler, logger)
-    stats = manager.get_storage_stats()
-    for partition, v in stats.items():
-        for element, data in v.items():
-            if data["percent_used"] > threshold:
-                logger.error(f"{element} usage in partition '{partition}' at {data['percent_used']:.1f}% capacity ({data['used']} / {data['total']})")
-
+        manager = get_workload_manager(handler, logger)
+        stats = manager.get_storage_stats()
+        for partition, v in stats.items():
+            for element, data in v.items():
+                if data["percent_used"] > threshold:
+                    logger.error(f"{element} usage in partition '{partition}' at {data['percent_used']:.1f}% capacity ({data['used']} / {data['total']})")
+    except Exception as e:
+        logger.exception(e)
+        raise e
 
 def storage_tracker(): # pragma: no cover
     """Utility for tracking storage usage on a cluster, and sending email notifications when the quota is almost filled."""
