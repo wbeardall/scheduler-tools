@@ -76,7 +76,7 @@ def storage_tracker(): # pragma: no cover
             }
         if kwargs.get("password"):
             env_vars["CLUSTER_SSH_PASSWORD"] = kwargs["password"]
-        make_service("rerun", command, env_vars)
+        make_service("storage-tracker", command, env_vars)
         # Hand over to service, so we don't need to run the rest now.
         return 
 
