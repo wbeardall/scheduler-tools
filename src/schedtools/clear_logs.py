@@ -16,13 +16,13 @@ def clear_cluster_logs(path: str, up_to: int, pattern: str = "pbs", recursive: b
     """
     assert os.path.exists(path) and os.path.isdir(path), "`path` must be a directory"
     if pattern == "pbs":
-        pattern = ".*\.pbs\.(e|o)\K[0-9]+$"
+        pattern = ".*\.pbs\.(e|o)\K\d+$"
     elif pattern == "slurm":
-        pattern = "^[0-9]+(?=\..*\.(out|err)$)"
+        pattern = "^\d+(?=\..*\.(out|err)$)"
     for file in os.listdir(path):
         filepath = os.path.join(path,file)
         if os.path.isdir(filepath) and recursive:
-            clear_cluster_logs(filepath, up_to=up_to, pattern=pattern, recursive=recursive, force=force)
+            clear_cluster_logs(filepath, up_to=up_to, pattern=pattern, recursive=recursive-1, force=force)
         match = re.match(pattern, file)
         if match is not None:
             job_id = int(file[slice(*match.span())])
@@ -41,8 +41,11 @@ def clear_logs():
     parser.add_argument("pattern", type=str, 
                         help="'pbs','slurm', or arbitrary regex to match job log files. If a regex, must "
                         "match the numeric job ID in the log name.")
-    parser.add_argument("-r","--recursive", action="store_true", 
-                        help="Recurse into subdirectories.")
+    parser.add_argument("-r","--recursive", type=int, nargs='?', const=-1, default=0,
+                        help="Recurse into subdirectories. Optionally, a max recursion depth can be specified. "
+                        "For example `-r 1` will only explore the provided path and its immediate subdirectories. "
+                        "If no recursion depth is provided, and `-r` is specified, the program will recurse down to "
+                        "the bottom of the directory tree.")
     parser.add_argument("-f","--force", action="store_true",
                         help="Remove log files without prompting the user first. CAUTION: using this option with a"
                         "regex pattern can silently remove arbitrary files.")
