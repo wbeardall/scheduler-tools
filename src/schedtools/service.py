@@ -45,6 +45,8 @@ User=root
 WantedBy=multi-user.target
 """
 
+    if is_active(service_id):
+        subprocess.call(["sudo", "systemctl", "stop", service_id])
     
     subprocess.call(["sudo", "bash", "-c", "echo '" + service_def + "' > " + service_file])
     subprocess.call(["sudo", "bash", "-c", "echo '" + env_str + "' > " + service_conf])
@@ -57,9 +59,14 @@ WantedBy=multi-user.target
     subprocess.call(["sudo", "systemctl", "enable", service_id])
     subprocess.call(["sudo", "systemctl", "start", service_id])
 
+def is_active(service_id: str):
+    return subprocess.run(
+        ["systemctl", "is-active", service_id],stdout=subprocess.DEVNULL
+    ).returncode == 0
+
 def remove_service(name: str):
-    allowed = ["rerun"]
-    assert name in allowed, "We do not allow removal of arbitrary services with this script."
+    allowed = ["rerun","storage-tracker"]
+    assert name in allowed, f"We do not allow removal of arbitrary services with this script. Only {allowed} can be removed, if registered."
     service_id = name.lower().replace(' ', '-')
     service_file = get_service_file(service_id)
     service_conf = f"/etc/{service_id}-service.conf"
