@@ -49,7 +49,7 @@ def check_status():
     parser.add_argument("-l", "--show-logs",action="store_true",
                         help="Display `journalctl` logs for each service. Requires elevated privileges, and so is "
                         "ignored if checking status on a remote machine.")
-    services = ["rerun"]
+    services = ["rerun", "storage-tracker"]
     args = parser.parse_args()
     if args.host is None:
         _check_status_local(services, args.show_logs)
