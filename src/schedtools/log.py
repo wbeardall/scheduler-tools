@@ -29,7 +29,7 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
     try:
         creds = load_credentials()
         mail_handler = SMTPHandler(
-            mailhost=creds.server,
+            mailhost=(creds.server, creds.port),
             fromaddr=creds.sender_address,
             toaddrs=[creds.destination_address],
             subject=f"{name} error", 
@@ -41,7 +41,7 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
         handlers.append(mail_handler)
         timed_handler = TimedSMTPHandler(
             os.path.join(tempfile.gettempdir(), "{}.log".format(name)),
-            mailhost=creds.server,
+            mailhost=(creds.server, creds.port),
             fromaddr=creds.sender_address,
             toaddrs=[creds.destination_address],
             subject=name+" log report", 
@@ -116,8 +116,25 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
         self.subject = subject
         self.secure = secure
         self.timeout = timeout
-        # NOTE: The first subject will be wrong if, e.g., there is an existing logfile
-        self.log_start = datetime.now()
+        try:
+            with open(self.timeFilename, "r") as f:
+                self.log_start = datetime.fromisoformat(f.read())
+        except (FileNotFoundError, ValueError):
+            self.log_start = datetime.now()
+
+    @property
+    def log_start(self):
+        return self._log_start
+    
+    @log_start.setter
+    def log_start(self, log_start):
+        with open(self.timeFilename, "w") as f:
+            f.write(log_start.isoformat())
+        self._log_start = log_start
+
+    @property
+    def timeFilename(self):
+        return self.baseFilename + ".log-start"
 
     def getSubject(self):
         now = datetime.now()
