@@ -319,7 +319,7 @@ Schedtools supports email-based notifications for high-priority errors.
 
 #### Setting up SMTP
 
-In order to receive email notifications, you need an email account (we recommend a throwaway account with a unique password for security) which supports SMTP, from which `schedtools` will send notifications to you. Outlook accounts are good for this, but Gmail accounts will no longer work out of the box due to Google's 2022 change to their credentials. However, if you do want to use a Gmail account for this, you should still be able to get it to work by enabling 2-step verification and using [app passwords](https://support.google.com/mail/answer/185833?hl=en).
+In order to receive email notifications, you need an email account which supports SMTP, from which `schedtools` will send notifications to you. There is a dedicated email account that I've made for this purpose; contact me to ask for the details. Alternatively, you can use any other email address of your liking. We recommend a throwaway account with a unique and strong password. Outlook accounts are good for this, but Gmail accounts will no longer work out of the box due to Google's 2022 change to their credentials. However, if you do want to use a Gmail account, you should still be able to get it to work by enabling 2-step verification and using [app passwords](https://support.google.com/mail/answer/185833?hl=en).
 
 These credentials are stored in `~/.schedtools/smtp.json`, and copied to a root-only file if needed by a `schedtools` program which is run as a service. Naturally, you should only use this on machines where you trust everyone that has root access (or ideally, where nobody else has root access).
 
