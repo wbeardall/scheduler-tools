@@ -1,19 +1,25 @@
-from datetime import datetime
 import logging
-from logging.handlers import SMTPHandler, TimedRotatingFileHandler
 import os
 import tempfile
+from datetime import datetime
+from logging.handlers import SMTPHandler, TimedRotatingFileHandler
 from typing import Union
 
-import systemd.journal as journald
+try:
+    import systemd.journal as journald  # type: ignore
+
+    HAS_JOURNALD = True
+except ImportError:
+    HAS_JOURNALD = False
 
 from schedtools.smtp import load_credentials
 from schedtools.utils import Singleton, journald_active, systemd_service
 
+
 def get_logger(name: Union[str, None] = None, with_timed=True):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable.
-    
-    If `systemd-journald` is active, and the program is being run as a `systemd` service, 
+
+    If `systemd-journald` is active, and the program is being run as a `systemd` service,
     logs are written to `journald`. Otherwise, logs are written to `${HOME}/.${SCHEDTOOLS_PROG}.log`
 
     In the case where the program is running as a service, but `journald` is not active, logs will
@@ -22,7 +28,7 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
     if name is None:
         name = os.environ["SCHEDTOOLS_PROG"]
     # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
-    user = os.environ.get("SCHEDTOOLS_USER",os.environ["LOGNAME"])
+    user = os.environ.get("SCHEDTOOLS_USER", os.environ["LOGNAME"])
     handlers = []
 
     # Email notifications
@@ -32,49 +38,55 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
             mailhost=(creds.server, creds.port),
             fromaddr=creds.sender_address,
             toaddrs=[creds.destination_address],
-            subject=f"{name} error", 
+            subject=f"{name} error",
             credentials=(creds.sender_address, creds.password),
-            secure=()
+            secure=(),
         )
         mail_handler.setLevel(logging.ERROR)
-        mail_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        mail_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
         handlers.append(mail_handler)
         timed_handler = TimedSMTPHandler(
             os.path.join(tempfile.gettempdir(), "{}.log".format(name)),
             mailhost=(creds.server, creds.port),
             fromaddr=creds.sender_address,
             toaddrs=[creds.destination_address],
-            subject=name+" log report", 
+            subject=name + " log report",
             credentials=(creds.sender_address, creds.password),
             secure=(),
-            when='d'
+            when="d",
         )
-        timed_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        timed_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
         handlers.append(timed_handler)
     except RuntimeError:
         pass
 
-    if journald_active() and systemd_service():
+    if journald_active() and systemd_service() and HAS_JOURNALD:
         handlers.append(journald.JournalHandler())
     else:
         handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
-    
+
     log = logging.getLogger(name)
     log.setLevel(logging.INFO)
     for handler in handlers:
         log.addHandler(handler)
     return log
 
+
 class Loggers(dict, metaclass=Singleton):
-    """Singleton dict-like logger registry. 
-    
+    """Singleton dict-like logger registry.
+
     Use to fetch loggers by name. If the requested logger does not exist,
     it is created, registered and returned.
 
     The named logger for the current `SCHEDTOOLS_PROG` can be accessed through the
     `current` attribute.
     """
-    def __getitem__(self,key):
+
+    def __getitem__(self, key):
         if key in self:
             return super().__getitem__(key)
         logger = get_logger(key)
@@ -85,7 +97,9 @@ class Loggers(dict, metaclass=Singleton):
     def current(self):
         return self[os.environ.get("SCHEDTOOLS_PROG", "base")]
 
+
 loggers = Loggers()
+
 
 class TimedSMTPHandler(TimedRotatingFileHandler):
     """
@@ -94,13 +108,35 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
     SMTP behaviour follows `logging.handlers.SMTPHandler`, whilst timing behaviour follows `logging.handlers.TimedRotatingFileHandler`,
     except in that the default period is 1 day instead of 1 hour.
     """
-    def __init__(self, filename, mailhost, fromaddr, toaddrs, subject,
-                 credentials=None, secure=None, timeout=5.0,
-                 when='d', interval=1, encoding=None, delay=False, utc=False, atTime=None):
-        super().__init__(filename, when=when, interval=interval, backupCount=1, # Think of the emailed log as the one backup.
-                         encoding=encoding, delay=delay,utc=utc,atTime=atTime)
-        
-        
+
+    def __init__(
+        self,
+        filename,
+        mailhost,
+        fromaddr,
+        toaddrs,
+        subject,
+        credentials=None,
+        secure=None,
+        timeout=5.0,
+        when="d",
+        interval=1,
+        encoding=None,
+        delay=False,
+        utc=False,
+        atTime=None,
+    ):
+        super().__init__(
+            filename,
+            when=when,
+            interval=interval,
+            backupCount=1,  # Think of the emailed log as the one backup.
+            encoding=encoding,
+            delay=delay,
+            utc=utc,
+            atTime=atTime,
+        )
+
         if isinstance(mailhost, (list, tuple)):
             self.mailhost, self.mailport = mailhost
         else:
@@ -125,7 +161,7 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
     @property
     def log_start(self):
         return self._log_start
-    
+
     @log_start.setter
     def log_start(self, log_start):
         with open(self.timeFilename, "w") as f:
@@ -138,10 +174,17 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
 
     def getSubject(self):
         now = datetime.now()
-        subject = self.subject + " (" + self.log_start.strftime("%Y-%m-%d %H:%M:%S") + " - " + now.strftime("%Y-%m-%d %H:%M:%S") + ")"
+        subject = (
+            self.subject
+            + " ("
+            + self.log_start.strftime("%Y-%m-%d %H:%M:%S")
+            + " - "
+            + now.strftime("%Y-%m-%d %H:%M:%S")
+            + ")"
+        )
         self.log_start = now
         return subject
-    
+
     def emit(self, record):
         """
         Emit a record. Emits to file before checking rollover, unlike builting RotatingFileHandler classes.
@@ -155,7 +198,7 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
                 self.doRollover()
         except Exception:
             self.handleError(record)
-    
+
     def rotate(self, source, dest):
         with open(self.baseFilename, "r", encoding=self.encoding) as f:
             self.send_email("\n".join(f.readlines()))
@@ -168,19 +211,19 @@ class TimedSMTPHandler(TimedRotatingFileHandler):
         Format the record and send it to the specified addressees.
         """
         try:
+            import email.utils
             import smtplib
             from email.message import EmailMessage
-            import email.utils
 
             port = self.mailport
             if not port:
                 port = smtplib.SMTP_PORT
             smtp = smtplib.SMTP(self.mailhost, port, timeout=self.timeout)
             msg = EmailMessage()
-            msg['From'] = self.fromaddr
-            msg['To'] = ','.join(self.toaddrs)
-            msg['Subject'] = self.getSubject()
-            msg['Date'] = email.utils.localtime()
+            msg["From"] = self.fromaddr
+            msg["To"] = ",".join(self.toaddrs)
+            msg["Subject"] = self.getSubject()
+            msg["Date"] = email.utils.localtime()
             msg.set_content(f"<pre>{record}</pre>", subtype="html")
             if self.username:
                 if self.secure is not None:

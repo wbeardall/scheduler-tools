@@ -49,7 +49,7 @@ Job Id: 7013474.pbs
 	t/tools:/opt/ibutils/bin:/opt/pbs/bin:/apps/anaconda3/4.9.2/install,
 	PBS_O_MAIL=/var/spool/mail/user,PBS_O_QUEUE=v1_gpu72,
 	PBS_O_HOST=cx3-2-29.cx3.hpc.ic.ac.uk
-    comment = Not Running: Insufficient amount of resource: ncpus 
+    comment = Not Running: Insufficient amount of resource: ncpus
     etime = Mon Feb 13 19:00:07 2023
     eligible_time = 01:10:51
     Submit_arguments = -W group_list=hpc-gstan /rds/general/user/user/home/pro
@@ -101,7 +101,7 @@ Job Id: 7013475.pbs
 	t/tools:/opt/ibutils/bin:/opt/pbs/bin:/apps/anaconda3/4.9.2/install,
 	PBS_O_MAIL=/var/spool/mail/user,PBS_O_QUEUE=v1_gpu72,
 	PBS_O_HOST=cx3-2-29.cx3.hpc.ic.ac.uk
-    comment = Not Running: Insufficient amount of resource: ncpus 
+    comment = Not Running: Insufficient amount of resource: ncpus
     etime = Mon Feb 13 19:00:08 2023
     eligible_time = 01:10:51
     Submit_arguments = -W group_list=hpc-gstan /rds/general/user/user/home/pro
@@ -112,48 +112,66 @@ Job Id: 7013475.pbs
     project = _pbs_project_default
 """
 
-with open(os.path.join(os.path.dirname(__file__),"dummy_tracked.json"),"r") as f:
+with open(os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), "r") as f:
     dummy_tracked = f.readlines()
 
+
 class DummyHandler(ShellHandler):
-    def __init__(self,valid=True, jobs=True, tracked=True, rerun=True, memkill=True, wallkill=True,qsub=True,
-                 qdel=True,data_threshold=False):
+    def __init__(
+        self,
+        valid=True,
+        jobs=True,
+        tracked=True,
+        rerun=True,
+        memkill=True,
+        wallkill=True,
+        qsub=True,
+        qdel=True,
+        data_threshold=False,
+    ):
         self.responses = {
-            "qstat": SSHResult([], [],[],0) if valid else SSHResult([], [],[],1),
-            "qstat -f": SSHResult([], dummy_queue.split("\n"),[],0) if jobs else SSHResult([], [],[],0),
-            f"cat {RERUN_TRACKED_FILE}": SSHResult([], dummy_tracked,[],0) if tracked else SSHResult([], [],[],1),
+            "qstat": SSHResult([], [], [], 0) if valid else SSHResult([], [], [], 1),
+            "qstat -f": SSHResult([], dummy_queue.split("\n"), [], 0)
+            if jobs
+            else SSHResult([], [], [], 0),
+            f"cat {RERUN_TRACKED_FILE}": SSHResult([], dummy_tracked, [], 0)
+            if tracked
+            else SSHResult([], [], [], 1),
             "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70134": (
-                SSHResult([],["PBS: job killed: mem"],[],159) if memkill else SSHResult([], [],[],0)
+                SSHResult([], ["PBS: job killed: mem"], [], 159)
+                if memkill
+                else SSHResult([], [], [], 0)
             ),
             "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70135": (
-                SSHResult([],["PBS: job killed: walltime"],[],159) if wallkill else SSHResult([], [],[],0)
-            )
+                SSHResult([], ["PBS: job killed: walltime"], [], 159)
+                if wallkill
+                else SSHResult([], [], [], 0)
+            ),
         }
         self.responses_in = {
-            "qrerun": SSHResult([],[],[],0) if rerun else SSHResult([],[],[],159),
-            "qsub": SSHResult([],[],[],0) if qsub else SSHResult([],[],[],38),
-            "qdel": SSHResult([],[],[],0) if qdel else SSHResult([],[],[],1),
+            "qrerun": SSHResult([], [], [], 0) if rerun else SSHResult([], [], [], 159),
+            "qsub": SSHResult([], [], [], 0) if qsub else SSHResult([], [], [], 38),
+            "qdel": SSHResult([], [], [], 0) if qdel else SSHResult([], [], [], 1),
         }
         if data_threshold:
             self.data_used = 900
         else:
             self.data_used = 200
 
-
     @property
     def login_message(self):
         return [
-            '', 
-            f'   Home       Data:  {self.data_used}GB of 1.00TB ({self.data_used//10}%)  ', 
-            '              Files: 976k of 10.00M (10%) ', 
-            '   Ephemeral  Data:  1GB of 109.95TB (0%) ', 
-            '              Files: 0k of 20.97M (0%)  '
+            "",
+            f"   Home       Data:  {self.data_used}GB of 1.00TB ({self.data_used//10}%)  ",
+            "              Files: 976k of 10.00M (10%) ",
+            "   Ephemeral  Data:  1GB of 109.95TB (0%) ",
+            "              Files: 0k of 20.97M (0%)  ",
         ]
 
-    def execute(self,command):
+    def execute(self, command):
         if command in self.responses:
             return self.responses[command]
-        for k,v in self.responses_in.items():
+        for k, v in self.responses_in.items():
             if k in command:
                 return v
-        return SSHResult([], [],["command not found."],1)
+        return SSHResult([], [], ["command not found."], 1)

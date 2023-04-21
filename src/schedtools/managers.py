@@ -1,7 +1,7 @@
+import re
 from abc import ABC, abstractmethod, abstractstaticmethod
 from functools import partialmethod
 from logging import Logger
-import re
 from typing import Any, Dict, Union
 
 from schedtools.core import PBSJob, Queue
@@ -10,11 +10,17 @@ from schedtools.log import loggers
 from schedtools.shell_handler import ShellHandler
 from schedtools.utils import retry_on
 
+
 class WorkloadManager(ABC):
     manager_check_cmd = None
     submit_cmd = None
     delete_cmd = None
-    def __init__(self, handler: Union[ShellHandler, str, Dict[str, Any]], logger: Union[Logger, None] = None) -> None:
+
+    def __init__(
+        self,
+        handler: Union[ShellHandler, str, Dict[str, Any]],
+        logger: Union[Logger, None] = None,
+    ) -> None:
         if not isinstance(handler, ShellHandler):
             handler = ShellHandler(handler)
         if logger is None:
@@ -25,17 +31,19 @@ class WorkloadManager(ABC):
     @abstractmethod
     def get_storage_stats(self):
         ...
-    
+
     @classmethod
     @retry_on(RecursionError, max_tries=2)
-    def is_valid(cls,handler: ShellHandler):
+    def is_valid(cls, handler: ShellHandler):
         result = handler.execute(cls.manager_check_cmd)
         if result.returncode == 0:
             return True
         elif result.returncode == 127:
             return False
         else:
-            raise RuntimeError(f"Command `{cls.manager_check_cmd}` failed with status {result.returncode}")
+            raise RuntimeError(
+                f"Command `{cls.manager_check_cmd}` failed with status {result.returncode}"
+            )
 
     def get_jobs(self):
         """Get full job information on all running / queued jobs"""
@@ -53,7 +61,7 @@ class WorkloadManager(ABC):
             raise JobSubmissionError(msg)
 
     def delete_job(self, job: Union[str, PBSJob]):
-        if isinstance(job,str):
+        if isinstance(job, str):
             job_id = job
         else:
             job_id = job.id
@@ -62,7 +70,7 @@ class WorkloadManager(ABC):
             msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr[0].strip()})"
             self.logger.info(msg)
             raise JobDeletionError(msg)
-        
+
     def was_killed(self, job: PBSJob):
         return self.was_killed_walltime(job) or self.was_killed_mem(job)
 
@@ -82,12 +90,14 @@ class WorkloadManager(ABC):
     def rerun_job(self, job: PBSJob):
         ...
 
+
 class UCL(WorkloadManager):
     # UCL cluster uses a variant of PBS, with slightly different commands
     manager_check_cmd = "jobhist"
     submit_cmd = "qsub"
     delete_cmd = "qdel"
     # TODO: Implement rest of functionality
+
 
 class PBS(WorkloadManager):
     manager_check_cmd = "qstat"
@@ -103,7 +113,7 @@ class PBS(WorkloadManager):
         section = {}
         for line in storage_lines:
             stat_name, tail = line.strip().split(":")
-            if len(stat_name.split())>1:
+            if len(stat_name.split()) > 1:
                 if section_name is not None:
                     stats[section_name] = section
                     section = {}
@@ -111,11 +121,11 @@ class PBS(WorkloadManager):
             section[stat_name] = dict(
                 used=re.findall("[0-9]+\.{0,1}[0-9]*[kMGTP](?=B{0,1} of)", tail)[0],
                 total=re.findall("(?<=of )[0-9]+\.{0,1}[0-9]*[kMGTP]", tail)[0],
-                percent_used=float(re.findall("(?<=\()[0-9]+\.{0,1}[0-9]*(?=\%\))", tail)[0])
+                percent_used=float(
+                    re.findall("(?<=\()[0-9]+\.{0,1}[0-9]*(?=\%\))", tail)[0]
+                ),
             )
         return stats
-            
-
 
     @staticmethod
     def get_jobs_from_handler(handler: ShellHandler):
@@ -134,11 +144,13 @@ class PBS(WorkloadManager):
             if line.startswith("Job Id: "):
                 if current_job:
                     jobs.append(current_job)
-                current_job = PBSJob({"id": re.findall("(?<=Job Id: )[0-9]+", line.strip())[0]})
+                current_job = PBSJob(
+                    {"id": re.findall("(?<=Job Id: )[0-9]+", line.strip())[0]}
+                )
                 current_key = ""
                 current_indent = 0
             elif " = " in line:
-                indent = line.index(" ") - len(line.lstrip('\t'))
+                indent = line.index(" ") - len(line.lstrip("\t"))
                 if indent > current_indent:
                     current_job[current_key] += line.strip()
                     current_indent = indent
@@ -158,8 +170,10 @@ class PBS(WorkloadManager):
 
             if result.returncode:
                 # Account not authorized for qrerun
-                if result.returncode==159:
-                    self.logger.info("User not authorized to use `qrerun`. Attempting to requeue from jobscript.")
+                if result.returncode == 159:
+                    self.logger.info(
+                        "User not authorized to use `qrerun`. Attempting to requeue from jobscript."
+                    )
                     self.qrerun_allowed = False
             else:
                 self.logger.info(f"Rerunning job {job.id}")
@@ -169,7 +183,7 @@ class PBS(WorkloadManager):
             msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})"
             self.logger.info(msg)
             # Number of jobs exceeds user's limit
-            if result.returncode==38:
+            if result.returncode == 38:
                 pass
             raise JobSubmissionError(msg)
         else:
@@ -184,9 +198,10 @@ class PBS(WorkloadManager):
         if f"PBS: job killed: {reason}" in tail:
             return True
         return False
-        
-    was_killed_mem = partialmethod(was_killed_reason,reason="mem")
-    was_killed_walltime = partialmethod(was_killed_reason,reason="walltime")
+
+    was_killed_mem = partialmethod(was_killed_reason, reason="mem")
+    was_killed_walltime = partialmethod(was_killed_reason, reason="walltime")
+
 
 class SLURM(WorkloadManager):
     manager_check_cmd = "sinfo"
@@ -195,16 +210,21 @@ class SLURM(WorkloadManager):
 
     @staticmethod
     def get_jobs_from_handler(handler: ShellHandler):
-        result = handler.execute("squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}")
+        result = handler.execute(
+            "squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}"
+        )
         raise NotImplementedError("SLURM job parsing not implemented currently.")
 
     def rerun_job(self, job: PBSJob):
         # TODO: implement
         # afternotok ensures job is only requeued if it failed (i.e. timed out)
-        #sbatch --dependency=afternotok:<jobid> <script>
+        # sbatch --dependency=afternotok:<jobid> <script>
         raise NotImplementedError()
 
-def get_workload_manager(handler: Union[ShellHandler, str], logger: Union[Logger, None]=None):
+
+def get_workload_manager(
+    handler: Union[ShellHandler, str], logger: Union[Logger, None] = None
+):
     if not isinstance(handler, ShellHandler):
         handler = ShellHandler(handler)
     if logger is None:
@@ -212,4 +232,6 @@ def get_workload_manager(handler: Union[ShellHandler, str], logger: Union[Logger
     for man_cls in [PBS, SLURM]:
         if man_cls.is_valid(handler):
             return man_cls(handler, logger)
-    raise RuntimeError("No recognised workload manager found on cluster. Valid managers are PBS, SLURM.")
+    raise RuntimeError(
+        "No recognised workload manager found on cluster. Valid managers are PBS, SLURM."
+    )

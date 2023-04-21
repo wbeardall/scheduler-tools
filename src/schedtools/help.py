@@ -1,5 +1,5 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -12,5 +12,6 @@ def help():
         console.print(Markdown(help_file.read()))
     sys.exit(0)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     help()

@@ -3,19 +3,19 @@ import os
 from logging import Logger
 from typing import Any, Dict, Union
 
+from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError
 from schedtools.log import loggers
-from schedtools.managers import get_workload_manager, WorkloadManager
-from schedtools.core import PBSJob, Queue
+from schedtools.managers import WorkloadManager, get_workload_manager
 from schedtools.shell_handler import ShellHandler
-from schedtools.utils import systemd_service, retry_on
+from schedtools.utils import retry_on, systemd_service
 
 RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
 if systemd_service():
     CACHE_DIR = "/var/tmp/rerun-service"
 else:
-    CACHE_DIR = os.path.join(os.path.expanduser("~"),".rerun")
-RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR,"rerun-tracked-cache.json")
+    CACHE_DIR = os.path.join(os.path.expanduser("~"), ".rerun")
+RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR, "rerun-tracked-cache.json")
 
 # Allow retry in case of traffic corruption
 @retry_on(json.decoder.JSONDecodeError, max_tries=5)
@@ -23,7 +23,7 @@ def get_tracked_from_cluster(handler: ShellHandler):
     f"""Get tracked job list from file
 
     Expects tracked jobs to be stored in `{RERUN_TRACKED_FILE}` (json-formatted)
-    
+
     Args:
         handler: `ShellHandler` instance to use to query cluster
     """
@@ -35,6 +35,7 @@ def get_tracked_from_cluster(handler: ShellHandler):
     raw = json.loads("\n".join(result.stdout))
     return Queue([PBSJob(job) for job in raw])
 
+
 def get_tracked_cache():
     if os.path.exists(RERUN_TRACKED_CACHE):
         with open(RERUN_TRACKED_CACHE, "r") as f:
@@ -43,16 +44,18 @@ def get_tracked_cache():
         cached = Queue()
     return cached
 
+
 def delete_queued_duplicates(
-    handler: Union[ShellHandler, str, Dict[str, Any]], 
-    manager: Union[WorkloadManager,None] = None,
+    handler: Union[ShellHandler, str, Dict[str, Any]],
+    manager: Union[WorkloadManager, None] = None,
     logger: Union[Logger, None] = None,
-    count_running: bool = False):
+    count_running: bool = False,
+):
     """Delete duplicates of queued jobs.
 
     This function determines job identity by the jobscript path, because job name is
     not guaranteed unique.
-    
+
     Args:
         handler: Shell handler instance, or SSH host alias or host config dictionary
         manager: Workload manager instance. Defaults to None.
@@ -80,11 +83,16 @@ def delete_queued_duplicates(
             pass
 
 
-def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Union[int, float]=90, logger: Union[Logger, None]=None, 
-               continue_on_rerun: bool= False, **kwargs):
+def rerun_jobs(
+    handler: Union[ShellHandler, str, Dict[str, Any]],
+    threshold: Union[int, float] = 90,
+    logger: Union[Logger, None] = None,
+    continue_on_rerun: bool = False,
+    **kwargs,
+):
     """Rerun PBS jobs where elapsed time is greater than threshold (%).
-    
-    kwargs are provided to pass e.g. passwords to the created handler instance 
+
+    kwargs are provided to pass e.g. passwords to the created handler instance
     without needing them stored anywhere.
 
     Args:
@@ -102,11 +110,13 @@ def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Uni
 
         manager = get_workload_manager(handler, logger)
         queued = manager.get_jobs()
-        
+
         tracked = get_tracked_from_cluster(handler)
-        
+
         tracked.update(get_tracked_cache())
-        to_rerun = Queue([job for job in tracked if (job not in queued) and manager.was_killed(job)])
+        to_rerun = Queue(
+            [job for job in tracked if (job not in queued) and manager.was_killed(job)]
+        )
         to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
         # Update list of tracked jobs
         tracked.update(queued)
@@ -114,7 +124,7 @@ def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Uni
         logger.info(f"{len(to_rerun)} jobs to rerun ({len(queued)} in queue).")
 
         for job in to_rerun:
-            try: 
+            try:
                 manager.rerun_job(job)
                 # Can untrack the job
                 tracked.pop(job)
@@ -122,16 +132,22 @@ def rerun_jobs(handler: Union[ShellHandler, str, Dict[str, Any]], threshold: Uni
                     manager.delete_job(job)
             except JobSubmissionError:
                 pass
-                    
+
         # Update the tracked job list
         tracked_json = json.dumps([job for job in tracked])
-        result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
+        result = handler.execute(
+            "echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}"
+        )
         if result.returncode:
-            logger.info(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})")
+            logger.info(
+                f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})"
+            )
             os.makedirs(CACHE_DIR, exist_ok=True)
-            with open(RERUN_TRACKED_CACHE,"w") as f:
+            with open(RERUN_TRACKED_CACHE, "w") as f:
                 f.write(tracked_json)
-            logger.info(f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution.")
+            logger.info(
+                f"Tracked jobs cached locally to {RERUN_TRACKED_CACHE}. They will be synced during the next job execution."
+            )
         else:
             # Can safely remove the cache
             if os.path.exists(RERUN_TRACKED_CACHE):

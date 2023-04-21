@@ -5,14 +5,14 @@
 
 ---
 
-Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided 
-programs with the `-s` flag will register them as services with `systemd` (see [Running Programs as Services](#running-programs-as-services)). 
+Basic tools for automating some PBS work. In progress, and potentially unsafe. In particular, running provided
+programs with the `-s` flag will register them as services with `systemd` (see [Running Programs as Services](#running-programs-as-services)).
 Registering a new service requires elevated privileges, so naturally you can't use programs in this way if you don't have
 root access to the machine you're using. Additionally, never run any untrusted program with elevated privileges, so don't use
 these programs in service mode unless you trust that I'm not doing anything nasty to your box!
 
-Running provided programs with the `-s` flag will register them with `systemd`, allowing them to be automatically 
-restarted upon reboot. This essentially fully automates the program on the server, so you don't have to worry about 
+Running provided programs with the `-s` flag will register them with `systemd`, allowing them to be automatically
+restarted upon reboot. This essentially fully automates the program on the server, so you don't have to worry about
 it again unless your box catches fire (or if you do one of the following things):
 
 1. Remove or move the environment `schedtools` is installed in (see [Package Usage](#package-usage))
@@ -24,15 +24,30 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 
 ## Installation
 
-This package relies on [systemd-python](https://pypi.org/project/systemd-python/) to interact with `journald`. As such,
-there are a few non-Python dependencies. These can be installed by running
+Basic installation with Pip is straightforward; simply clone this repository, `cd` into it, and run
+
+```
+pip install .
+```
+
+This package relies on [`systemd-python`](https://pypi.org/project/systemd-python/) to interact with `journald`. If you
+want  `journald` logging, please ensure that these are installed prior to `schedtools` installation by running
 
 ```
 sudo apt-get install gcc pkg-config libsystemd-dev
 ```
 
-We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode. 
-This minimises the probability that changes to the environment breaks the service in a way that might not be noticed 
+**NOTE**: If these packages are not installed, by default `schedtools` will still install, and simply not use `journald`
+logging. If you want to ensure that requirements for `journald` logging are met, install `schedtools` with the following:
+
+```
+pip install .[journald]
+```
+
+Installation will explicitly fail if `systemd-python` cannot be built.
+
+We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode.
+This minimises the probability that changes to the environment breaks the service in a way that might not be noticed
 for a while (in case you don't check your logs frequently!).
 
 ```
@@ -46,11 +61,11 @@ pip install -e .
 ### `check-status`
 
 Check the status of `schedtools` utilities that have been registered as services with `systemd`.
-This command can be used to check locally-registered utilities, or those on a remote machine by specifying the 
-hostname when calling the program. In the future, this might be expanded to include status checks for 
+This command can be used to check locally-registered utilities, or those on a remote machine by specifying the
+hostname when calling the program. In the future, this might be expanded to include status checks for
 daemonized `schedtools` utilities.
 
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag.
 
 #### Usage
 
@@ -65,7 +80,7 @@ check-status -h
 Clear old cluster log files with job IDs below a certain threshold. This program is designed to be run on a
 login shell on the cluster upon which it is clearing logs, not run remotely.
 
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag.
 
 #### Usage
 
@@ -77,19 +92,19 @@ clear-logs -h
 
 ### `convert-jobscripts`
 
-Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa. 
+Convert jobscripts from `.pbs` format into `.sbatch` format, or vice versa.
 
-**Note** In order for converted jobscripts to work on the other cluster, any paths in the jobscript must be consistent 
+**Note** In order for converted jobscripts to work on the other cluster, any paths in the jobscript must be consistent
 across both file structures. In order to achieve this, it is sufficient to ensure that:
 
 1. All paths in the jobscript are relative to `$HOME`
-2. The directory paths are consistent relative to `$HOME` across clusters. 
+2. The directory paths are consistent relative to `$HOME` across clusters.
 
 As an example, `$HOME/my-project/outputs/out.log` would be consistent, assuming `my-project` is located in `$HOME` on both
 clusters.
 
-**Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a 
-`-s` flag. 
+**Note** this utility is not designed to be run as a service, as it is a simple conversion tool. Therefore, it lacks a
+`-s` flag.
 
 #### Usage
 
@@ -134,7 +149,7 @@ schedtools-help
 ### `remote-command`
 
 Run arbitrary commands on a remote machine. This is a simple quality-of-life utility that prevents you
-having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the 
+having to connect via SSH yourself for simple tasks, like checking job status. The utility mirrors the
 `stdout`, `stderr` and exit status on the remote machine.
 
 #### Usage
@@ -162,7 +177,7 @@ remote-command -h
 
 Remove `schedtools` utilities that have been registered as services with `systemd`.
 
-**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag. 
+**Note** this utility is not designed to be run as a service. Therefore, it lacks a `-s` flag.
 
 #### Usage
 
@@ -175,7 +190,7 @@ remove-service -h
 ### `rerun`
 
 Periodically check the runtimes of scheduled jobs on a cluster, and `qrerun` them if they are close to timing out.
-This program runs itself in a daemon context (see [Running Programs as Daemons](#running-programs-as-daemons)) 
+This program runs itself in a daemon context (see [Running Programs as Daemons](#running-programs-as-daemons))
 if not running as a service, and so is `SIGHUP`-safe.
 
 #### Usage
@@ -187,7 +202,7 @@ rerun -h
 ```
 
 If you have manager-level privileges on the cluster, usage is straightforward, as the program can simply call the `qrerun`
-command with the IDs of any jobs that are at risk of timing out. 
+command with the IDs of any jobs that are at risk of timing out.
 
 **Warning**
 If you *do not have manager-level privileges* (which is likely to be the case), there are a couple considerations you need
@@ -220,9 +235,9 @@ the environment is stable.
 
 ### Before You Start
 
-`schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`). 
+`schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`).
 We recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
-authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and 
+authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and
 prevent `schedtools` from needing to store credentials itself. However, if `schedtools` does have to store the password,
 it is stored in a config file to which only `root` has access, so it is as secure as storing SSH keys locally.
 
@@ -242,7 +257,7 @@ to increase security. `schedtools` is not designed to handle the TOTP side of au
 If your cluster allows it, we recommend using key-based authentication to allow `schedtools` programs SSH access.
 
 **Note**: The login servers at the Imperial College RCS don't allow key-based authentication. If you're using `schedtools`
-with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether 
+with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether
 your cluster supports key-based authentication.
 
 1. Generate a key pair on your local machine with `ssh-keygen`
@@ -313,9 +328,9 @@ journalctl -fu rerun.service
 
 The `-f` flag in the above only shows the most recent logs, rather than the whole log stack.
 
-### Setting Up Email Notifications 
+### Setting Up Email Notifications
 
-Schedtools supports email-based notifications for high-priority errors. 
+Schedtools supports email-based notifications for high-priority errors.
 
 #### Setting up SMTP
 
@@ -333,10 +348,10 @@ Alternatively, you can manually create the `JSON` file, and format it as shown b
 
 ```
 {
-  "server": "smtp.office365.com", 
-  "port": 587, 
-  "sender_address": "throwaway-email@domain.com", 
-  "password": "a-secure-password", 
+  "server": "smtp.office365.com",
+  "port": 587,
+  "sender_address": "throwaway-email@domain.com",
+  "password": "a-secure-password",
   "destination_address": "my-email@domain.com"
 }
 ```

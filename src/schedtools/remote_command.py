@@ -3,11 +3,14 @@ import sys
 
 from schedtools.shell_handler import ShellHandler
 
+
 def remote_command():
     """Utility for running arbitrary commands on a remote machine."""
     parser = argparse.ArgumentParser(description=remote_command.__doc__)
-    parser.add_argument("host",help="Hostname upon which to run command.")
-    parser.add_argument("command",nargs="+",help="Arbitrary shell command to run on remote machine.")
+    parser.add_argument("host", help="Hostname upon which to run command.")
+    parser.add_argument(
+        "command", nargs="+", help="Arbitrary shell command to run on remote machine."
+    )
     args = parser.parse_args()
     handler = ShellHandler(args.host)
     command = []
@@ -20,9 +23,10 @@ def remote_command():
                 el = f'"{el}"'
         command.append(el)
     result = handler.execute(" ".join(command))
-    print("".join(result.stdout),file=sys.stdout)
-    print("".join(result.stderr),file=sys.stderr)
+    print("".join(result.stdout), file=sys.stdout)
+    print("".join(result.stderr), file=sys.stderr)
     exit(result.returncode)
-    
-if __name__=="__main__":
+
+
+if __name__ == "__main__":
     remote_command()

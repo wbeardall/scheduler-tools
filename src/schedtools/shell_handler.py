@@ -1,22 +1,22 @@
+import re
 from collections import namedtuple
 from typing import Union
 
 import paramiko
-import re
 
 from schedtools.utils import connect_to_host
 
-SSHResult = namedtuple("SSHResult","stdin stdout stderr returncode")
+SSHResult = namedtuple("SSHResult", "stdin stdout stderr returncode")
+
 
 class ShellHandler:
-
     def __init__(self, ssh: Union[paramiko.SSHClient, str], **kwargs):
         if not isinstance(ssh, paramiko.SSHClient):
             ssh = connect_to_host(ssh, **kwargs)
         self.ssh = ssh
         channel = self.ssh.invoke_shell()
-        self.stdin = channel.makefile('wb')
-        self.stdout = channel.makefile('r')
+        self.stdin = channel.makefile("wb")
+        self.stdout = channel.makefile("r")
         # Execute a dummy command to clear any login-related shell junk
         self.login_message = self.execute("echo").stdout[:-3]
 
@@ -25,7 +25,7 @@ class ShellHandler:
             self.ssh.close()
         except:
             pass
-    
+
     def close(self):
         self.ssh.close()
 
@@ -39,11 +39,11 @@ class ShellHandler:
         """
         if not len(cmd):
             raise ValueError("Cannot execute empty command.")
-        cmd = cmd.strip('\n')
-        self.stdin.write(cmd + '\n')
-        finish = 'end of stdOUT buffer. finished with exit status'
-        echo_cmd = 'echo {} $?'.format(finish)
-        self.stdin.write(echo_cmd + '\n')
+        cmd = cmd.strip("\n")
+        self.stdin.write(cmd + "\n")
+        finish = "end of stdOUT buffer. finished with exit status"
+        echo_cmd = "echo {} $?".format(finish)
+        self.stdin.write(echo_cmd + "\n")
         shin = self.stdin
         self.stdin.flush()
 
@@ -66,8 +66,8 @@ class ShellHandler:
             else:
                 if unformat:
                     # get rid of 'coloring and formatting' special characters
-                    line = re.compile(r'(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]').sub('', line)
-                shout.append(line.replace('\b', '').replace('\r', ''))
+                    line = re.compile(r"(\x9B|\x1B\[)[0-?]*[ -/]*[@-~]").sub("", line)
+                shout.append(line.replace("\b", "").replace("\r", ""))
 
         # first and last lines of shout/sherr contain a prompt
         if shout and echo_cmd in shout[-1]:
