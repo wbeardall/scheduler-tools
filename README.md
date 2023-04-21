@@ -24,9 +24,14 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 
 ## Installation
 
-Basic installation with Pip is straightforward; simply clone this repository, `cd` into it, and run
+**NOTE**: This package is only designed to work on Linux. It relies on a number of non-Python commands, and utilises Linux-specific
+directory structures. If you don't have access to a Linux machine, this package is not for you.
+
+Basic installation with Pip is straightforward:
 
 ```
+git clone https://github.com/wbeardall/scheduler-tools.git
+cd scheduler-tools
 pip install .
 ```
 
@@ -55,6 +60,137 @@ conda create -n schedtools python=3.8
 conda activate schedtools
 pip install -e .
 ```
+
+## Package Usage
+
+Recommended: Run the provided tools as services (with the `-s` flag) where applicable, in a dedicated environment.
+
+This should allow the service to access the correct Python installation upon repeated reboots, and ensures that
+the environment is stable.
+
+### Before You Start
+
+`schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`).
+We recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
+authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and
+prevent `schedtools` from needing to store credentials itself. However, if `schedtools` does have to store the password,
+it is stored in a config file to which only `root` has access, so it is as secure as storing SSH keys locally.
+
+Ensure that you've added *at least* the following information to your SSH config for the cluster you're interfacing with:
+
+```
+Host my-cluster
+  HostName my-cluster-address.com
+  User cluster-username
+```
+
+Note that certain clusters, such as [SULIS](https://sulis-hpc.github.io/) use TOTP (Time-based One Time Password) authentication
+to increase security. `schedtools` is not designed to handle the TOTP side of authentication, so you must manage this yourself.
+
+### Setting Up Key-Based Authentication
+
+If your cluster allows it, we recommend using key-based authentication to allow `schedtools` programs SSH access.
+
+**Note**: The login servers at the Imperial College RCS don't allow key-based authentication. If you're using `schedtools`
+with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether
+your cluster supports key-based authentication.
+
+1. Generate a key pair on your local machine with `ssh-keygen`
+
+```
+ssh-keygen -f $HOME/.ssh/cluster_rsa
+```
+
+2. Copy the public key to the cluster with `ssh-copy-id`
+
+If you've already added the cluster to your `$HOME/.ssh/config`, you can simply run
+
+```
+ssh-copy-id -i $HOME/.ssh/cluster_rsa my-cluster
+```
+
+Otherwise, provide the full address:
+
+```
+ssh-copy-id -i $HOME/.ssh/cluster_rsa user@host
+```
+
+3. Add the key to your `$HOME/.ssh/config`. The updated config entry should look like this:
+
+```
+Host my-cluster
+  HostName my-cluster-address.com
+  User cluster-username
+  IdentityFile ~/.ssh/cluster_rsa
+```
+
+### Running Programs as Daemons
+
+If you've done the above correctly, you should be able to run (e.g. the `rerun` utility) in daemon mode
+as follows:
+
+```
+rerun my-cluster
+```
+
+The program will daemonize itself, so it is safe to log out of your session, and the program will continue running
+until you reboot the machine. You can check that the program is running properly by calling
+
+```
+ps aux | grep schedtools
+```
+
+### Running Programs as Services
+
+Programs (e.g. the `rerun` utility) can be run in service mode as follows:
+
+```
+rerun my-cluster -s
+```
+
+This will register the program as a service with `systemd`. This ensures that the program is relaunched upon reboot.
+You can check that the service is running properly by calling
+
+```
+systemctl status rerun.service
+```
+
+If your machine uses `journald` (likely), then logs can be accessed by calling
+
+```
+journalctl -fu rerun.service
+```
+
+The `-f` flag in the above only shows the most recent logs, rather than the whole log stack.
+
+### Setting Up Email Notifications
+
+Schedtools supports email-based notifications for high-priority errors.
+
+#### Setting up SMTP
+
+In order to receive email notifications, you need an email account which supports SMTP, from which `schedtools` will send notifications to you. There is a dedicated email account that I've made for this purpose; contact me to ask for the details. Alternatively, you can use any other email address of your liking. We recommend a throwaway account with a unique and strong password. Outlook accounts are good for this, but Gmail accounts will no longer work out of the box due to Google's 2022 change to their credentials. However, if you do want to use a Gmail account, you should still be able to get it to work by enabling 2-step verification and using [app passwords](https://support.google.com/mail/answer/185833?hl=en).
+
+These credentials are stored in `~/.schedtools/smtp.json`, and copied to a root-only file if needed by a `schedtools` program which is run as a service. Naturally, you should only use this on machines where you trust everyone that has root access (or ideally, where nobody else has root access).
+
+We provide a [prompt-based credentials script](#create-smtp-credentials), which can be called after `schedtools` installation with
+
+```
+create-smtp-credentials
+```
+
+Alternatively, you can manually create the `JSON` file, and format it as shown below. The `destination_address` field is optional; if omitted, emails will both send from and be delivered to the `sender_address`.
+
+```
+{
+  "server": "smtp.office365.com",
+  "port": 587,
+  "sender_address": "throwaway-email@domain.com",
+  "password": "a-secure-password",
+  "destination_address": "my-email@domain.com"
+}
+```
+
 
 ## Programs
 
@@ -224,134 +360,4 @@ For detailed information on the CLI for the `rerun` utility, run the following c
 
 ```
 storage-tracker -h
-```
-
-## Package Usage
-
-Recommended: Run the provided tools as services (with the `-s` flag), in a dedicated environment.
-
-This should allow the service to access the correct Python installation upon repeated reboots, and ensures that
-the environment is stable.
-
-### Before You Start
-
-`schedtools` programs pull cluster SSH information from your user-level SSH configuration file (`$HOME/.ssh/config`).
-We recommend setting up key-based authentication with the cluster for security, if the cluster allows public key
-authentication (see below). This will prevent the need to enter your password into any `schedtools` programs, and
-prevent `schedtools` from needing to store credentials itself. However, if `schedtools` does have to store the password,
-it is stored in a config file to which only `root` has access, so it is as secure as storing SSH keys locally.
-
-Ensure that you've added *at least* the following information to your SSH config for the cluster you're interfacing with:
-
-```
-Host my-cluster
-  HostName my-cluster-address.com
-  User cluster-username
-```
-
-Note that certain clusters, such as [SULIS](https://sulis-hpc.github.io/) use TOTP (Time-based One Time Password) authentication
-to increase security. `schedtools` is not designed to handle the TOTP side of authentication, so you must manage this yourself.
-
-### Setting Up Key-Based Authentication
-
-If your cluster allows it, we recommend using key-based authentication to allow `schedtools` programs SSH access.
-
-**Note**: The login servers at the Imperial College RCS don't allow key-based authentication. If you're using `schedtools`
-with the Imperial College RCS, this section is not relevant to you. Check with your HPC admin if you're unsure whether
-your cluster supports key-based authentication.
-
-1. Generate a key pair on your local machine with `ssh-keygen`
-
-```
-ssh-keygen -f $HOME/.ssh/cluster_rsa
-```
-
-2. Copy the public key to the cluster with `ssh-copy-id`
-
-If you've already added the cluster to your `$HOME/.ssh/config`, you can simply run
-
-```
-ssh-copy-id -i $HOME/.ssh/cluster_rsa my-cluster
-```
-
-Otherwise, provide the full address:
-
-```
-ssh-copy-id -i $HOME/.ssh/cluster_rsa user@host
-```
-
-3. Add the key to your `$HOME/.ssh/config`. The updated config entry should look like this:
-
-```
-Host my-cluster
-  HostName my-cluster-address.com
-  User cluster-username
-  IdentityFile ~/.ssh/cluster_rsa
-```
-
-### Running Programs as Daemons
-
-If you've done the above correctly, you should be able to run (e.g. the `rerun` utility) in daemon mode
-as follows:
-
-```
-rerun my-cluster
-```
-
-The program will daemonize itself, so it is safe to log out of your session, and the program will continue running
-until you reboot the machine. You can check that the program is running properly by calling
-
-```
-ps aux | grep schedtools
-```
-
-### Running Programs as Services
-
-Programs (e.g. the `rerun` utility) can be run in service mode as follows:
-
-```
-rerun my-cluster -s
-```
-
-This will register the program as a service with `systemd`. This ensures that the program is relaunched upon reboot.
-You can check that the service is running properly by calling
-
-```
-systemctl status rerun.service
-```
-
-If your machine uses `journald` (likely), then logs can be accessed by calling
-
-```
-journalctl -fu rerun.service
-```
-
-The `-f` flag in the above only shows the most recent logs, rather than the whole log stack.
-
-### Setting Up Email Notifications
-
-Schedtools supports email-based notifications for high-priority errors.
-
-#### Setting up SMTP
-
-In order to receive email notifications, you need an email account which supports SMTP, from which `schedtools` will send notifications to you. There is a dedicated email account that I've made for this purpose; contact me to ask for the details. Alternatively, you can use any other email address of your liking. We recommend a throwaway account with a unique and strong password. Outlook accounts are good for this, but Gmail accounts will no longer work out of the box due to Google's 2022 change to their credentials. However, if you do want to use a Gmail account, you should still be able to get it to work by enabling 2-step verification and using [app passwords](https://support.google.com/mail/answer/185833?hl=en).
-
-These credentials are stored in `~/.schedtools/smtp.json`, and copied to a root-only file if needed by a `schedtools` program which is run as a service. Naturally, you should only use this on machines where you trust everyone that has root access (or ideally, where nobody else has root access).
-
-We provide a [prompt-based credentials script](#create-smtp-credentials), which can be called after `schedtools` installation with
-
-```
-create-smtp-credentials
-```
-
-Alternatively, you can manually create the `JSON` file, and format it as shown below. The `destination_address` field is optional; if omitted, emails will both send from and be delivered to the `sender_address`.
-
-```
-{
-  "server": "smtp.office365.com",
-  "port": 587,
-  "sender_address": "throwaway-email@domain.com",
-  "password": "a-secure-password",
-  "destination_address": "my-email@domain.com"
-}
 ```
