@@ -1,7 +1,7 @@
 import subprocess
 from configparser import ConfigParser
 
-from setuptools import setup
+from setuptools import setup  # type: ignore
 
 config = ConfigParser()
 config.read("setup.cfg")
