@@ -1,4 +1,5 @@
 import re
+import subprocess
 from collections import namedtuple
 from typing import Union
 
@@ -6,10 +7,40 @@ import paramiko
 
 from schedtools.utils import connect_to_host
 
-SSHResult = namedtuple("SSHResult", "stdin stdout stderr returncode")
+SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
 
 
-class ShellHandler:
+class CommandHandler:
+    pass
+
+
+class LocalHandler(CommandHandler):
+    """Thin wrapper of `subprocess.run` to allow for local use of `schedtools.managers.WorkloadManager` objects."""
+
+    login_message = []
+
+    def execute(self, cmd: str, unformat: bool = False):
+        """
+
+        Examples:
+            >>> execute('ls')
+            >>> execute('finger')
+            >>> execute('cd folder_name')
+
+        Args:
+            cmd: the command to be executed on the remote computer
+            unformat: remove formatting special characters from output
+        """
+        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        return SSHResult(
+            stdin=cmd,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            returncode=result.returncode,
+        )
+
+
+class ShellHandler(CommandHandler):
     def __init__(self, ssh: Union[paramiko.SSHClient, str], **kwargs):
         if not isinstance(ssh, paramiko.SSHClient):
             ssh = connect_to_host(ssh, **kwargs)
@@ -18,7 +49,7 @@ class ShellHandler:
         self.stdin = channel.makefile("wb")
         self.stdout = channel.makefile("r")
         # Execute a dummy command to clear any login-related shell junk
-        self.login_message = self.execute("echo").stdout[:-3]
+        self.login_message = self.execute("echo").stdout.split("\n")[:-3]
 
     def __del__(self):
         try:
@@ -29,13 +60,17 @@ class ShellHandler:
     def close(self):
         self.ssh.close()
 
-    def execute(self, cmd: str, unformat=False):
-        """
+    def execute(self, cmd: str, unformat: bool = False):
+        """Execute a command remotely.
 
-        :param cmd: the command to be executed on the remote computer
-        :examples:  execute('ls')
-                    execute('finger')
-                    execute('cd folder_name')
+        Examples:
+            >>> execute('ls')
+            >>> execute('finger')
+            >>> execute('cd folder_name')
+
+        Args:
+            cmd: the command to be executed on the remote computer
+            unformat: remove formatting special characters from output
         """
         if not len(cmd):
             raise ValueError("Cannot execute empty command.")
@@ -79,4 +114,4 @@ class ShellHandler:
         if sherr and cmd in sherr[0]:
             sherr.pop(0)
 
-        return SSHResult(shin, shout, sherr, exit_status)
+        return SSHResult(cmd, "\n".join(shout), "\n".join(sherr), exit_status)

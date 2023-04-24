@@ -1,13 +1,14 @@
 import json
 import os
+from functools import partial
 from logging import Logger
 from typing import Any, Dict, Union
 
 from schedtools.core import PBSJob, Queue
-from schedtools.exceptions import JobDeletionError, JobSubmissionError
+from schedtools.exceptions import JobDeletionError, JobSubmissionError, QueueFullError
 from schedtools.log import loggers
 from schedtools.managers import WorkloadManager, get_workload_manager
-from schedtools.shell_handler import ShellHandler
+from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
 from schedtools.utils import retry_on, systemd_service
 
 RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
@@ -19,7 +20,7 @@ RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR, "rerun-tracked-cache.json")
 
 # Allow retry in case of traffic corruption
 @retry_on(json.decoder.JSONDecodeError, max_tries=5)
-def get_tracked_from_cluster(handler: ShellHandler):
+def get_tracked_from_cluster(handler: CommandHandler):
     f"""Get tracked job list from file
 
     Expects tracked jobs to be stored in `{RERUN_TRACKED_FILE}` (json-formatted)
@@ -27,13 +28,16 @@ def get_tracked_from_cluster(handler: ShellHandler):
     Args:
         handler: `ShellHandler` instance to use to query cluster
     """
-    if not isinstance(handler, ShellHandler):
+    if not isinstance(handler, CommandHandler):
         handler = ShellHandler(handler)
     result = handler.execute(f"cat {RERUN_TRACKED_FILE}")
     if result.returncode or not len(result.stdout):
         return Queue([])
-    raw = json.loads("\n".join(result.stdout))
+    raw = json.loads(result.stdout)
     return Queue([PBSJob(job) for job in raw])
+
+
+get_tracked_local = partial(get_tracked_from_cluster, handler=LocalHandler())
 
 
 def get_tracked_cache():
@@ -46,7 +50,7 @@ def get_tracked_cache():
 
 
 def delete_queued_duplicates(
-    handler: Union[ShellHandler, str, Dict[str, Any]],
+    handler: Union[CommandHandler, str, Dict[str, Any]],
     manager: Union[WorkloadManager, None] = None,
     logger: Union[Logger, None] = None,
     count_running: bool = False,
@@ -62,7 +66,7 @@ def delete_queued_duplicates(
         logger: Logger instance. Defaults to None.
         count_running: Include running jobs when identifying duplicates. Defaults to False.
     """
-    if not isinstance(handler, ShellHandler):
+    if not isinstance(handler, CommandHandler):
         handler = ShellHandler(handler)
     if manager is None:
         manager = get_workload_manager(handler, logger or loggers.current)
@@ -84,7 +88,7 @@ def delete_queued_duplicates(
 
 
 def rerun_jobs(
-    handler: Union[ShellHandler, str, Dict[str, Any]],
+    handler: Union[CommandHandler, str, Dict[str, Any]],
     threshold: Union[int, float] = 90,
     logger: Union[Logger, None] = None,
     continue_on_rerun: bool = False,
@@ -105,7 +109,7 @@ def rerun_jobs(
         logger = loggers.current
     try:
         logger.info("Executing rerun.")
-        if not isinstance(handler, ShellHandler):
+        if not isinstance(handler, CommandHandler):
             handler = ShellHandler(handler, **kwargs)
 
         manager = get_workload_manager(handler, logger)
@@ -130,8 +134,11 @@ def rerun_jobs(
                 tracked.pop(job)
                 if job in queued and not continue_on_rerun:
                     manager.delete_job(job)
-            except JobSubmissionError:
-                pass
+            except JobSubmissionError as e:
+                if isinstance(e, QueueFullError):
+                    break
+                else:
+                    pass
 
         # Update the tracked job list
         tracked_json = json.dumps([job for job in tracked])
@@ -140,7 +147,7 @@ def rerun_jobs(
         )
         if result.returncode:
             logger.info(
-                f"Saving tracked jobs failed with status {result.returncode} ({result.stderr[0].strip()})"
+                f"Saving tracked jobs failed with status {result.returncode} ({result.stderr.strip()})"
             )
             os.makedirs(CACHE_DIR, exist_ok=True)
             with open(RERUN_TRACKED_CACHE, "w") as f:

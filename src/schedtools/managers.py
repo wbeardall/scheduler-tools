@@ -5,9 +5,9 @@ from logging import Logger
 from typing import Any, Dict, Union
 
 from schedtools.core import PBSJob, Queue
-from schedtools.exceptions import JobDeletionError, JobSubmissionError
+from schedtools.exceptions import JobDeletionError, JobSubmissionError, QueueFullError
 from schedtools.log import loggers
-from schedtools.shell_handler import ShellHandler
+from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
 from schedtools.utils import retry_on
 
 
@@ -18,10 +18,10 @@ class WorkloadManager(ABC):
 
     def __init__(
         self,
-        handler: Union[ShellHandler, str, Dict[str, Any]],
+        handler: Union[CommandHandler, str, Dict[str, Any]],
         logger: Union[Logger, None] = None,
     ) -> None:
-        if not isinstance(handler, ShellHandler):
+        if not isinstance(handler, CommandHandler):
             handler = ShellHandler(handler)
         if logger is None:
             logger = loggers.current
@@ -34,7 +34,7 @@ class WorkloadManager(ABC):
 
     @classmethod
     @retry_on(RecursionError, max_tries=2)
-    def is_valid(cls, handler: ShellHandler):
+    def is_valid(cls, handler: CommandHandler):
         result = handler.execute(cls.manager_check_cmd)
         if result.returncode == 0:
             return True
@@ -50,13 +50,13 @@ class WorkloadManager(ABC):
         return self.get_jobs_from_handler(self.handler)
 
     @abstractstaticmethod
-    def get_jobs_from_handler(handler: ShellHandler):
+    def get_jobs_from_handler(handler: CommandHandler):
         ...
 
     def submit_job(self, jobscript_path: str):
         result = self.handler.execute(f"{self.submit_cmd} {jobscript_path}")
         if result.returncode:
-            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.info(msg)
             raise JobSubmissionError(msg)
 
@@ -67,7 +67,7 @@ class WorkloadManager(ABC):
             job_id = job.id
         result = self.handler.execute(f"{self.delete_cmd} {job_id}")
         if result.returncode:
-            msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.info(msg)
             raise JobDeletionError(msg)
 
@@ -127,13 +127,23 @@ class PBS(WorkloadManager):
             )
         return stats
 
+    def submit_job(self, jobscript_path: str):
+        result = self.handler.execute(f"{self.submit_cmd} {jobscript_path}")
+        if result.returncode:
+            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
+            self.logger.info(msg)
+            # Number of jobs exceeds user's limit
+            if result.returncode == 38:
+                raise QueueFullError(msg)
+            raise JobSubmissionError(msg)
+
     @staticmethod
-    def get_jobs_from_handler(handler: ShellHandler):
+    def get_jobs_from_handler(handler: CommandHandler):
         """Get full job information on all running / queued jobs"""
         result = handler.execute("qstat -f")
         if result.returncode:
             raise RuntimeError(f"qstat failed with returncode {result.returncode}")
-        data = result.stdout
+        data = result.stdout.split("\n")
         jobs = []
         current_job = PBSJob()
         current_key = ""
@@ -175,16 +185,21 @@ class PBS(WorkloadManager):
                         "User not authorized to use `qrerun`. Attempting to requeue from jobscript."
                     )
                     self.qrerun_allowed = False
+                # Number of jobs exceeds user's limit
+                elif result.returncode == 38:
+                    msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr.strip()})"
+                    self.logger.info(msg)
+                    raise QueueFullError(msg)
             else:
                 self.logger.info(f"Rerunning job {job.id}")
                 return
         result = self.handler.execute(f"qsub {job.jobscript_path}")
         if result.returncode:
-            msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr[0].strip()})"
+            msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.info(msg)
             # Number of jobs exceeds user's limit
             if result.returncode == 38:
-                pass
+                raise QueueFullError(msg)
             raise JobSubmissionError(msg)
         else:
             self.logger.info(f"Rerunning job {job.id} ({job.name})")
@@ -194,8 +209,7 @@ class PBS(WorkloadManager):
         if result.returncode:
             # TODO: Make more robust
             return False
-        tail = "\n".join(result.stdout)
-        if f"PBS: job killed: {reason}" in tail:
+        if f"PBS: job killed: {reason}" in result.stdout:
             return True
         return False
 
@@ -209,7 +223,7 @@ class SLURM(WorkloadManager):
     delete_cmd = "scancel"
 
     @staticmethod
-    def get_jobs_from_handler(handler: ShellHandler):
+    def get_jobs_from_handler(handler: CommandHandler):
         result = handler.execute(
             "squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}"
         )
@@ -223,10 +237,13 @@ class SLURM(WorkloadManager):
 
 
 def get_workload_manager(
-    handler: Union[ShellHandler, str], logger: Union[Logger, None] = None
+    handler: Union[CommandHandler, str], logger: Union[Logger, None] = None
 ):
-    if not isinstance(handler, ShellHandler):
-        handler = ShellHandler(handler)
+    if not isinstance(handler, CommandHandler):
+        if handler == "local":
+            handler = LocalHandler()
+        else:
+            handler = ShellHandler(handler)
     if logger is None:
         logger = loggers.current
     for man_cls in [PBS, SLURM]:

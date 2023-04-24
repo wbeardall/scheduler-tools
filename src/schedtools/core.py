@@ -1,6 +1,10 @@
 from typing import List, Union
+import uuid
 
 from schedtools.utils import walltime_to
+
+DEFAULT_PRIORITY = 0
+UNSUBMITTED_PRIORITY = -1
 
 
 class PBSJob(dict):
@@ -18,6 +22,7 @@ class PBSJob(dict):
         T="moving",
         W="waiting",
         S="suspended",
+        U="unsubmitted",  # This is an additional flag for jobs which are tracked but have not been submitted
     )
     # TODO: Make into a proper dataclass if needed.
     def __getattr__(self, key, *args, **kwargs):
@@ -25,6 +30,23 @@ class PBSJob(dict):
             return super().__getattr__(key, *args, **kwargs)
         except AttributeError:
             return self.__getitem__(key, *args, **kwargs)
+        
+    @classmethod
+    def unsubmitted(cls, jobscript_path):
+        """Create unsubmitted job for tracking with low priority.
+
+        Args:
+            jobscript_path: path to jobscript.
+
+        Returns:
+            PBSJob
+        """
+        return cls(
+            id=str(uuid.uuid1()),
+            jobscript_path=jobscript_path,
+            job_state="U",
+            priority=UNSUBMITTED_PRIORITY
+        )
 
     @property
     def id(self):
@@ -33,6 +55,17 @@ class PBSJob(dict):
     @property
     def name(self):
         return self["Job_Name"]
+
+    @property
+    def priority(self):
+        return int(
+            self.get(
+                "priority",
+                UNSUBMITTED_PRIORITY
+                if self.status == "unsubmitted"
+                else DEFAULT_PRIORITY,
+            )
+        )
 
     @property
     def jobscript_path(self):
@@ -56,7 +89,7 @@ class PBSJob(dict):
 
     @property
     def status(self):
-        return self.status_dict[self["job_state"]]
+        return self.status_dict[self.get("job_state", "U")]
 
     @property
     def is_running(self):
@@ -88,7 +121,8 @@ class Queue:
         self.jobs.update(other)
 
     def __iter__(self):
-        return iter(self.jobs.values())
+        # Sort by priority when iterating
+        return iter(sorted(self.jobs.values(), key=lambda x: x.priority, reverse=True))
 
     def __contains__(self, job):
         if isinstance(job, PBSJob):

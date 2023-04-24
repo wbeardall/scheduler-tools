@@ -113,7 +113,7 @@ Job Id: 7013475.pbs
 """
 
 with open(os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), "r") as f:
-    dummy_tracked = f.readlines()
+    dummy_tracked = f.read()
 
 
 class DummyHandler(ShellHandler):
@@ -130,28 +130,28 @@ class DummyHandler(ShellHandler):
         data_threshold=False,
     ):
         self.responses = {
-            "qstat": SSHResult([], [], [], 0) if valid else SSHResult([], [], [], 1),
-            "qstat -f": SSHResult([], dummy_queue.split("\n"), [], 0)
+            "qstat": SSHResult("", "", "", 0) if valid else SSHResult("", "", "", 1),
+            "qstat -f": SSHResult("", dummy_queue, "", 0)
             if jobs
-            else SSHResult([], [], [], 0),
-            f"cat {RERUN_TRACKED_FILE}": SSHResult([], dummy_tracked, [], 0)
+            else SSHResult("", "", "", 0),
+            f"cat {RERUN_TRACKED_FILE}": SSHResult("", dummy_tracked, "", 0)
             if tracked
-            else SSHResult([], [], [], 1),
+            else SSHResult("", "", "", 1),
             "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70134": (
-                SSHResult([], ["PBS: job killed: mem"], [], 159)
+                SSHResult("", "PBS: job killed: mem", "", 159)
                 if memkill
-                else SSHResult([], [], [], 0)
+                else SSHResult("", "", "", 0)
             ),
             "cat /rds/general/user/user/home/project-directory/scripts/job-03.pbs.o70135": (
-                SSHResult([], ["PBS: job killed: walltime"], [], 159)
+                SSHResult("", "PBS: job killed: walltime", "", 159)
                 if wallkill
-                else SSHResult([], [], [], 0)
+                else SSHResult("", "", "", 0)
             ),
         }
         self.responses_in = {
-            "qrerun": SSHResult([], [], [], 0) if rerun else SSHResult([], [], [], 159),
-            "qsub": SSHResult([], [], [], 0) if qsub else SSHResult([], [], [], 38),
-            "qdel": SSHResult([], [], [], 0) if qdel else SSHResult([], [], [], 1),
+            "qrerun": SSHResult("", "", "", 0) if rerun else SSHResult("", "", "", 159),
+            "qsub": SSHResult("", "", "", 0) if qsub else SSHResult("", "", "", 38),
+            "qdel": SSHResult("", "", "", 0) if qdel else SSHResult("", "", "", 1),
         }
         if data_threshold:
             self.data_used = 900
@@ -174,4 +174,4 @@ class DummyHandler(ShellHandler):
         for k, v in self.responses_in.items():
             if k in command:
                 return v
-        return SSHResult([], [], ["command not found."], 1)
+        return SSHResult("", "", "command not found.", 1)
