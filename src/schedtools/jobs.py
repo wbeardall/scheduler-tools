@@ -2,7 +2,7 @@ import json
 import os
 from functools import partial
 from logging import Logger
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import JobDeletionError, JobSubmissionError, QueueFullError
@@ -39,6 +39,36 @@ def get_tracked_from_cluster(handler: CommandHandler):
 
 get_tracked_local = partial(get_tracked_from_cluster, handler=LocalHandler())
 
+def track_new_jobs(handler: CommandHandler, jobs: Union[PBSJob, List[PBSJob]], 
+    logger: Union[Logger, None] = None):
+    """Add new jobs to the tracked list.
+
+    Useful if the scheduler queue is full, but there are still more jobs to submit.
+    Effectively gives the user an infinite job queue. Concurrent running job limits naturally still apply.
+
+    Args:
+        handler: `ShellHandler` instance to use to query cluster
+        jobs: job or list of jobs to track.
+        logger: Logger instance. Defaults to None.
+
+    Raises:
+        RuntimeError: saving tracked jobs failed.
+    """
+    if isinstance(jobs, PBSJob):
+        jobs = [jobs]
+    if logger is None:
+        logger = loggers.current
+    tracked = get_tracked_from_cluster(handler)
+    tracked.extend(jobs)
+    # Update the tracked job list
+    tracked_json = json.dumps([job for job in tracked])
+    result = handler.execute(
+        "echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}"
+    )
+    if result.returncode:
+        e = RuntimeError(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr.strip()})")
+        logger.exception(e)
+        raise e
 
 def get_tracked_cache():
     if os.path.exists(RERUN_TRACKED_CACHE):
@@ -122,10 +152,11 @@ def rerun_jobs(
             [job for job in tracked if (job not in queued) and manager.was_killed(job)]
         )
         to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
+
         # Update list of tracked jobs
         tracked.update(queued)
 
-        logger.info(f"{len(to_rerun)} jobs to rerun ({len(queued)} in queue).")
+        logger.info(f"{len(to_rerun)} jobs to rerun ({len(tracked)} total tracked, {len(queued)} in queue).")
 
         for job in to_rerun:
             try:
