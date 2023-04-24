@@ -21,9 +21,13 @@ def check_system_packages_installed(packages):
         packages = [packages]
     cmd = ["dpkg", "-s"]
     cmd.extend(packages)
-    return not subprocess.run(
-        cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-    ).returncode
+    try:
+        return not subprocess.run(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ).returncode
+    except FileNotFoundError:
+        # dpkg not installed
+        return False
 
 
 # If GCC, pkg-config and libsystemd-dev are installed, we can also install systemd-python,
