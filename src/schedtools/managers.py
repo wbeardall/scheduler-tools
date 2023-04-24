@@ -59,16 +59,16 @@ class WorkloadManager(ABC):
             msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.info(msg)
             raise JobSubmissionError(msg)
-        
+
     def submit_or_track(self, jobscript_path: str):
         from schedtools.jobs import track_new_jobs
+
         try:
             self.submit_job(jobscript_path)
         except JobSubmissionError:
             self.logger.info(f"Tracking unsubmitted job ({jobscript_path}).")
             job = PBSJob.unsubmitted(jobscript_path)
             track_new_jobs(self.handler, job, logger=self.logger)
-
 
     def delete_job(self, job: Union[str, PBSJob]):
         if isinstance(job, str):

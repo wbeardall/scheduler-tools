@@ -39,8 +39,12 @@ def get_tracked_from_cluster(handler: CommandHandler):
 
 get_tracked_local = partial(get_tracked_from_cluster, handler=LocalHandler())
 
-def track_new_jobs(handler: CommandHandler, jobs: Union[PBSJob, List[PBSJob]], 
-    logger: Union[Logger, None] = None):
+
+def track_new_jobs(
+    handler: CommandHandler,
+    jobs: Union[PBSJob, List[PBSJob]],
+    logger: Union[Logger, None] = None,
+):
     """Add new jobs to the tracked list.
 
     Useful if the scheduler queue is full, but there are still more jobs to submit.
@@ -62,13 +66,14 @@ def track_new_jobs(handler: CommandHandler, jobs: Union[PBSJob, List[PBSJob]],
     tracked.extend(jobs)
     # Update the tracked job list
     tracked_json = json.dumps([job for job in tracked])
-    result = handler.execute(
-        "echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}"
-    )
+    result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
     if result.returncode:
-        e = RuntimeError(f"Saving tracked jobs failed with status {result.returncode} ({result.stderr.strip()})")
+        e = RuntimeError(
+            f"Saving tracked jobs failed with status {result.returncode} ({result.stderr.strip()})"
+        )
         logger.exception(e)
         raise e
+
 
 def get_tracked_cache():
     if os.path.exists(RERUN_TRACKED_CACHE):
@@ -156,7 +161,9 @@ def rerun_jobs(
         # Update list of tracked jobs
         tracked.update(queued)
 
-        logger.info(f"{len(to_rerun)} jobs to rerun ({len(tracked)} total tracked, {len(queued)} in queue).")
+        logger.info(
+            f"{len(to_rerun)} jobs to rerun ({len(tracked)} total tracked, {len(queued)} in queue)."
+        )
 
         for job in to_rerun:
             try:

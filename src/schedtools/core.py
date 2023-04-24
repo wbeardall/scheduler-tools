@@ -1,5 +1,5 @@
-from typing import List, Union
 import uuid
+from typing import List, Union
 
 from schedtools.utils import walltime_to
 
@@ -30,7 +30,7 @@ class PBSJob(dict):
             return super().__getattr__(key, *args, **kwargs)
         except AttributeError:
             return self.__getitem__(key, *args, **kwargs)
-        
+
     @classmethod
     def unsubmitted(cls, jobscript_path):
         """Create unsubmitted job for tracking with low priority.
@@ -45,7 +45,7 @@ class PBSJob(dict):
             id=str(uuid.uuid1()),
             jobscript_path=jobscript_path,
             job_state="U",
-            priority=UNSUBMITTED_PRIORITY
+            priority=UNSUBMITTED_PRIORITY,
         )
 
     @property
