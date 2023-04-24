@@ -27,8 +27,7 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
     """
     if name is None:
         name = os.environ["SCHEDTOOLS_PROG"]
-    # Preferentially use `SCHEDTOOLS_USER` in case we're running as a service
-    user = os.environ.get("SCHEDTOOLS_USER", os.environ["LOGNAME"])
+
     handlers = []
 
     # Email notifications
@@ -67,7 +66,18 @@ def get_logger(name: Union[str, None] = None, with_timed=True):
     if journald_active() and systemd_service() and HAS_JOURNALD:
         handlers.append(journald.JournalHandler())
     else:
-        handlers.append(logging.FileHandler("/home/{}/.{}.log".format(user, name)))
+        if systemd_service():
+            # If systemd service, we have to assume a standard home directory location.
+            user_home = "/home/{}".format(os.environ["SCHEDTOOLS_USER"])
+        else:
+            user_home = os.path.expanduser("~")
+        try:
+            handlers.append(
+                logging.FileHandler(os.path.join(user_home, f".{name}.log"))
+            )
+        except FileNotFoundError:
+            # Non-standard home directory location, skip file logging
+            pass
 
     log = logging.getLogger(name)
     log.setLevel(logging.INFO)
