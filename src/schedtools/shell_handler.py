@@ -31,7 +31,7 @@ class LocalHandler(CommandHandler):
             cmd: the command to be executed on the remote computer
             unformat: remove formatting special characters from output
         """
-        result = subprocess.run(cmd.split(), capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, shell=True, text=True)
         return SSHResult(
             stdin=cmd,
             stdout=result.stdout,

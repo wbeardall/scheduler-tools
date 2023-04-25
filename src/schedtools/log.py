@@ -16,7 +16,7 @@ from schedtools.smtp import load_credentials
 from schedtools.utils import Singleton, journald_active, systemd_service
 
 
-def get_logger(name: Union[str, None] = None, with_timed=True):
+def get_logger(name: Union[str, None] = None):
     """Gets a logger with a particular name. If None, infers from `SCHEDTOOLS_PROG` environment variable.
 
     If `systemd-journald` is active, and the program is being run as a `systemd` service,

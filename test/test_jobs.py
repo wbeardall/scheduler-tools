@@ -11,8 +11,10 @@ from schedtools.jobs import (
     get_tracked_cache,
     get_tracked_from_cluster,
     rerun_jobs,
+    track_new_jobs,
 )
 from schedtools.managers import PBS
+from schedtools.shell_handler import LocalHandler
 
 if __package__ is None or __package__ == "":
     from dummy_handler import DummyHandler
@@ -57,6 +59,31 @@ def test_get_tracked(to_destroy, tracked):
         assert len(queue) == 2
     else:
         assert len(queue) == 0
+
+
+@pytest.mark.parametrize("tracked", [True, False])
+def test_track_new_jobs(to_destroy, tracked):
+    n_new = 3
+    if tracked:
+        tracked_path = os.path.join(
+            os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1]
+        )
+        to_destroy.append(tracked_path)
+        shutil.copyfile(
+            os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), tracked_path
+        )
+    new_jobs = [PBSJob.unsubmitted(os.devnull) for _ in range(n_new)]
+
+    handler = LocalHandler()
+
+    track_new_jobs(handler, new_jobs)
+
+    queue = get_tracked_from_cluster(handler)
+
+    if tracked:
+        assert len(queue) == 2 + n_new
+    else:
+        assert len(queue) == 0 + n_new
 
 
 @pytest.mark.parametrize(
