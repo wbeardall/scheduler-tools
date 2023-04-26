@@ -161,8 +161,14 @@ def rerun_jobs(
         # Update list of tracked jobs
         tracked.update(queued)
 
+        breakdown = ", ".join(
+            [
+                f"{tracked.count(status)} {status}"
+                for status in ["running", "queued", "unsubmitted"]
+            ]
+        )
         logger.info(
-            f"{len(to_rerun)} jobs to rerun ({len(tracked)} total tracked, {len(queued)} in queue)."
+            f"{len(to_rerun)} jobs to rerun ({len(tracked)} total tracked, {breakdown})."
         )
 
         for job in to_rerun:

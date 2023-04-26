@@ -44,3 +44,5 @@ def test_queue_priority_inference():
     for job in queue:
         assert job.priority <= last_priority
         last_priority = job.priority
+    assert queue.count("unsubmitted") == 1
+    assert queue.count("queued") == 1
