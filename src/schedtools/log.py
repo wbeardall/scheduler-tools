@@ -1,7 +1,7 @@
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, time
 from logging.handlers import SMTPHandler, TimedRotatingFileHandler
 from typing import Union
 
@@ -54,7 +54,8 @@ def get_logger(name: Union[str, None] = None):
             subject=name + " log report",
             credentials=(creds.sender_address, creds.password),
             secure=(),
-            when="d",
+            when="midnight",
+            atTime=time(hour=9, minute=0),
         )
         timed_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
