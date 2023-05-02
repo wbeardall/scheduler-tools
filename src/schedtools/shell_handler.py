@@ -49,7 +49,9 @@ class ShellHandler(CommandHandler):
         self.stdin = channel.makefile("wb")
         self.stdout = channel.makefile("r")
         # Execute a dummy command to clear any login-related shell junk
-        self.login_message = self.execute("echo").stdout.split("\n")[:-3]
+        self.login_message = [
+            el for el in self.execute("echo").stdout.split("\n") if len(el)
+        ][:-1]
 
     def __del__(self):
         try:
