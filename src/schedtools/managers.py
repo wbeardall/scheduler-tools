@@ -202,7 +202,7 @@ class PBS(WorkloadManager):
                     self.qrerun_allowed = False
                 # Number of jobs exceeds user's limit
                 elif result.returncode == 38:
-                    msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr.strip()})"
+                    msg = f"Rerun job {job.id} ({job.name}) failed with status {result.returncode} ({result.stderr.strip()})"
                     self.logger.info(msg)
                     raise QueueFullError(msg)
             else:
@@ -210,7 +210,7 @@ class PBS(WorkloadManager):
                 return
         result = self.handler.execute(f"qsub {job.jobscript_path}")
         if result.returncode:
-            msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr.strip()})"
+            msg = f"Rerun job {job.id} ({job.name}) failed with status {result.returncode} ({result.stderr.strip()})"
             if result.stderr.strip() == "qsub: script file:: No such file or directory":
                 self.logger.error(msg)
                 raise MissingJobScriptError(msg)
