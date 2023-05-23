@@ -5,7 +5,12 @@ from logging import Logger
 from typing import Any, Dict, Union
 
 from schedtools.core import PBSJob, Queue
-from schedtools.exceptions import JobDeletionError, JobSubmissionError, QueueFullError
+from schedtools.exceptions import (
+    JobDeletionError,
+    JobSubmissionError,
+    MissingJobScriptError,
+    QueueFullError,
+)
 from schedtools.log import loggers
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
 from schedtools.utils import retry_on
@@ -206,7 +211,11 @@ class PBS(WorkloadManager):
         result = self.handler.execute(f"qsub {job.jobscript_path}")
         if result.returncode:
             msg = f"Rerun job {job.id} failed with status {result.returncode} ({result.stderr.strip()})"
-            self.logger.info(msg)
+            if result.stderr.strip() == "qsub: script file:: No such file or directory":
+                self.logger.error(msg)
+                raise MissingJobScriptError(msg)
+            else:
+                self.logger.info(msg)
             # Number of jobs exceeds user's limit
             if result.returncode == 38:
                 raise QueueFullError(msg)

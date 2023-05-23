@@ -5,7 +5,12 @@ from logging import Logger
 from typing import Any, Dict, List, Union
 
 from schedtools.core import PBSJob, Queue
-from schedtools.exceptions import JobDeletionError, JobSubmissionError, QueueFullError
+from schedtools.exceptions import (
+    JobDeletionError,
+    JobSubmissionError,
+    MissingJobScriptError,
+    QueueFullError,
+)
 from schedtools.log import loggers
 from schedtools.managers import WorkloadManager, get_workload_manager
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
@@ -157,7 +162,17 @@ def rerun_jobs(
             [job for job in tracked if (job not in queued) and manager.was_killed(job)]
         )
         to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
-
+        completed = Queue(
+            [
+                job
+                for job in tracked
+                if (job not in queued)
+                and job.is_running
+                and not manager.was_killed(job)
+            ]
+        )
+        for job in completed:
+            tracked.pop(job)
         # Update list of tracked jobs
         tracked.update(queued)
 
@@ -181,8 +196,9 @@ def rerun_jobs(
             except JobSubmissionError as e:
                 if isinstance(e, QueueFullError):
                     break
-                else:
-                    pass
+                elif isinstance(e, MissingJobScriptError):
+                    # Missing jobscript, so job can never be requeued.
+                    tracked.pop(job)
 
         # Update the tracked job list
         tracked_json = json.dumps([job for job in tracked])

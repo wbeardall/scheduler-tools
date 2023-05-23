@@ -55,7 +55,10 @@ def _check_status_remote(host, services, show_logs):
 
 def check_status():
     """Utility for checking the status of `schedtools` programs registered as services locally or on a remote machine."""
-    parser = argparse.ArgumentParser(description=check_status.__doc__)
+    parser = argparse.ArgumentParser(
+        description=check_status.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "host",
         default=None,

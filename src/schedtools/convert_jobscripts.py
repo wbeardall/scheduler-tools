@@ -22,7 +22,10 @@ def convert_jobscripts():
 
     Note that any paths in the jobscripts should be consistent across the two clusters
     (for example, be of the form `$HOME/path/to/file`, with the same relative path.)"""
-    parser = argparse.ArgumentParser(description=convert_jobscripts.__doc__)
+    parser = argparse.ArgumentParser(
+        description=convert_jobscripts.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "format",
         type=str,
