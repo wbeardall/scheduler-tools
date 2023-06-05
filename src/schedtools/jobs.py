@@ -162,17 +162,23 @@ def rerun_jobs(
             [job for job in tracked if (job not in queued) and manager.was_killed(job)]
         )
         to_rerun.extend([job for job in queued if job.percent_completion >= threshold])
-        # completed = Queue(
-        #     [
-        #         job
-        #         for job in tracked
-        #         if (job not in queued)
-        #         and job.is_running
-        #         and not manager.was_killed(job)
-        #     ]
-        # )
-        # for job in completed:
-        #     tracked.pop(job)
+        # Remove completed jobs that no longer appear in the queue AND were not killed AND
+        # were running at last register AND for which the entire runtime has elapsed.
+        completed = Queue(
+            [
+                job
+                for job in tracked
+                if (job not in queued)
+                and job.is_running
+                and job.has_elapsed
+                and not manager.was_killed(job)
+            ]
+        )
+        for job in completed:
+            logger.info(
+                f"Job {job.id} ({job.name}) appears completed. Removing from tracked list."
+            )
+            tracked.pop(job)
         # Update list of tracked jobs
         tracked.update(queued)
 

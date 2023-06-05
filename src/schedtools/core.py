@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta
 from typing import List, Union
 
 from schedtools.utils import walltime_to
@@ -98,6 +99,29 @@ class PBSJob(dict):
     @property
     def is_queued(self):
         return self.status == "queued"
+
+    @property
+    def walltime(self):
+        hours, minutes, seconds = map(int, self["Resource_List.walltime"].split(":"))
+        return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+    @property
+    def start_time(self):
+        if "stime" in self:
+            return datetime.strptime(self["stime"], "%a %b %d %H:%M:%S %Y")
+        return None
+
+    @property
+    def end_time(self):
+        if self.start_time is None:
+            return None
+        return self.start_time + self.walltime
+
+    @property
+    def has_elapsed(self):
+        if self.end_time is None:
+            return False
+        return self.end_time < datetime.now()
 
 
 class Queue:
