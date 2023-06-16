@@ -49,7 +49,7 @@ logging. If you want to ensure that requirements for `journald` logging are met,
 pip install .[journald]
 ```
 
-Installation will explicitly fail if `systemd-python` cannot be built.
+If you specify `.[journald]`, Installation will explicitly fail if `systemd-python` cannot be built.
 
 We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode.
 This minimises the probability that changes to the environment breaks the service in a way that might not be noticed
