@@ -27,7 +27,7 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 **NOTE**: This package is only designed to work on Linux. It relies on a number of non-Python commands, and utilises Linux-specific
 directory structures. If you don't have access to a Linux machine, this package is not for you.
 
-Basic installation with Pip is straightforward:
+Basic installation with `pip` is straightforward:
 
 ```
 git clone https://github.com/wbeardall/scheduler-tools.git
