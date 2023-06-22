@@ -211,7 +211,7 @@ class PBS(WorkloadManager):
         result = self.handler.execute(f"qsub {job.jobscript_path}")
         if result.returncode:
             msg = f"Rerun job {job.id} ({job.name}) failed with status {result.returncode} ({result.stderr.strip()})"
-            if result.stderr.strip() == "qsub: script file:: No such file or directory":
+            if "script file:: No such" in result.stderr.strip():
                 self.logger.error(msg)
                 raise MissingJobScriptError(msg)
             else:
