@@ -274,7 +274,8 @@ delete-duplicate-jobs -h
 
 ### `queue-status`
 
-This utility simply prints the repository `README.md` to your terminal for easy access to the documentation.
+This utility fetches the current job queue on a cluster and displays it in the default spreadsheet editor on
+your machine for
 
 #### Usage
 
