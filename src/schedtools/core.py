@@ -28,7 +28,7 @@ class PBSJob(dict):
     # TODO: Make into a proper dataclass if needed.
     def __getattr__(self, key, *args, **kwargs):
         try:
-            return super().__getattr__(key, *args, **kwargs)
+            return super().__getattribute__(key, *args, **kwargs)
         except AttributeError:
             return self.__getitem__(key, *args, **kwargs)
 

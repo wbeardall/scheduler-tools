@@ -272,14 +272,14 @@ For detailed information on the CLI for the `delete-duplicate-jobs` utility, run
 delete-duplicate-jobs -h
 ```
 
-### `schedtools-help`
+### `queue-status`
 
 This utility simply prints the repository `README.md` to your terminal for easy access to the documentation.
 
 #### Usage
 
 ```
-schedtools-help
+queue-status hostname
 ```
 
 ### `remote-command`
@@ -349,6 +349,16 @@ PBS job information (call `qstat -f` to see what this datastructure looks like).
 2. Not delete your jobscripts after submission, as `rerun` will need access to them to resubmit the jobs
 
     **Note** You can use your ephemeral storage for these except in the case of extremely long-running jobs
+
+### `schedtools-help`
+
+This utility simply prints the repository `README.md` to your terminal for easy access to the documentation.
+
+#### Usage
+
+```
+schedtools-help
+```
 
 ### `storage-tracker`
 
