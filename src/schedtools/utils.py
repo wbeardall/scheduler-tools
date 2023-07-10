@@ -1,4 +1,5 @@
 import os
+import platform
 import re
 import subprocess
 import traceback
@@ -92,6 +93,8 @@ def memory_to(memory, scale="MB"):
 
 
 def journald_active():
+    if platform.system() in ["Windows", "Darwin"]:
+        return False
     return not subprocess.run(
         "systemctl is-active --quiet systemd-journald".split()
     ).returncode
