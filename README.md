@@ -27,11 +27,23 @@ Only PBS is supported for now. Functionality might be extended to support SLURM 
 **NOTE**: This package is only designed to work on Linux. It relies on a number of non-Python commands, and utilises Linux-specific
 directory structures. If you don't have access to a Linux machine, this package is not for you.
 
-Basic installation with `pip` is straightforward:
+Basic installation with `pipx` (or `pip`) is straightforward. We recommend installing `schedtools` in a dedicated 
+environment, especially if intended to be used in service mode. This minimises the probability that changes to 
+the environment breaks the service in a way that might not be noticed for a while (in case you don't check 
+your logs frequently!). We recommend to install with [pipx](https://pipx.pypa.io/stable/), 
+which will transparently manage a venv for you.
 
 ```
 git clone https://github.com/wbeardall/scheduler-tools.git
 cd scheduler-tools
+pipx install .
+```
+
+However, if you prefer to use, e.g. Conda, simply create a new environment for package installation.
+
+```
+conda create -n schedtools python=3.8
+conda activate schedtools
 pip install .
 ```
 
@@ -46,20 +58,10 @@ sudo apt-get install gcc pkg-config libsystemd-dev
 logging. If you want to ensure that requirements for `journald` logging are met, install `schedtools` with the following:
 
 ```
-pip install .[journald]
+pipx install .[journald]
 ```
 
 If you specify `.[journald]`, Installation will explicitly fail if `systemd-python` cannot be built.
-
-We recommend installing `schedtools` in a dedicated environment, especially if intended to be used in service mode.
-This minimises the probability that changes to the environment breaks the service in a way that might not be noticed
-for a while (in case you don't check your logs frequently!).
-
-```
-conda create -n schedtools python=3.8
-conda activate schedtools
-pip install -e .
-```
 
 ## Package Usage
 
