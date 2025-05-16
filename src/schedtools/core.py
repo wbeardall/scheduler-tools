@@ -164,6 +164,9 @@ class Queue:
 
     def __len__(self):
         return len(self.jobs)
+    
+    def get(self, job_id: str) -> PBSJob:
+        return self.jobs[job_id]
 
     def count(self, status):
         assert status in PBSJob.status_dict.values()

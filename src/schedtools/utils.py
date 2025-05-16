@@ -9,9 +9,9 @@ from functools import wraps
 from getpass import getpass
 
 import paramiko
+import paramiko.config
 
-
-def connect_to_host(host_alias, get_password=False, **kwargs):
+def connect_to_host(host_alias, get_password=False, allow_prompt=True, **kwargs) -> paramiko.SSHClient:
     """Connect to an SSH host using an alias defined in `~/.ssh/config`.
 
     Args:
@@ -45,7 +45,9 @@ def connect_to_host(host_alias, get_password=False, **kwargs):
     except (
         paramiko.ssh_exception.PasswordRequiredException,
         paramiko.ssh_exception.AuthenticationException,
-    ):
+    ) as e:
+        if not allow_prompt:
+            raise e
         password = getpass(
             prompt="Password for {}@{}: ".format(
                 host_config["user"], host_config["hostname"]
