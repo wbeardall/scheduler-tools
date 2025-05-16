@@ -9,7 +9,6 @@ from schedtools.utils import connect_to_host
 
 SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
 
-
 class CommandHandler:
     pass
 

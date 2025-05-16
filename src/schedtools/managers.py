@@ -1,3 +1,4 @@
+import json
 import re
 from abc import ABC, abstractmethod, abstractstaticmethod
 from functools import partialmethod
@@ -20,6 +21,7 @@ class WorkloadManager(ABC):
     manager_check_cmd = None
     submit_cmd = None
     delete_cmd = None
+    get_jobs_json_cmd = None
 
     def __init__(
         self,
@@ -54,8 +56,9 @@ class WorkloadManager(ABC):
         """Get full job information on all running / queued jobs"""
         return self.get_jobs_from_handler(self.handler)
 
-    @abstractstaticmethod
-    def get_jobs_from_handler(handler: CommandHandler):
+    @classmethod
+    @abstractmethod
+    def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue:
         ...
 
     def submit_job(self, jobscript_path: str):
@@ -152,8 +155,26 @@ class PBS(WorkloadManager):
                 raise QueueFullError(msg)
             raise JobSubmissionError(msg)
 
-    @staticmethod
-    def get_jobs_from_handler(handler: CommandHandler):
+    @classmethod
+    def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue:
+        if cls.get_jobs_json_cmd:
+            return cls.get_jobs_from_handler_json(handler)
+        else:
+            return cls.get_jobs_from_handler_native(handler)
+
+    @classmethod
+    def get_jobs_from_handler_json(cls, handler: CommandHandler) -> Queue:
+        result = handler.execute(cls.get_jobs_json_cmd)
+        if result.returncode:
+            raise RuntimeError(f"{cls.get_jobs_json_cmd} failed with returncode {result.returncode}")
+        data = json.loads(result.stdout)
+        jobs = []
+        for id, job_data in data.items():
+            jobs.append(PBSJob({**job_data, "id": id}))
+        return Queue(jobs)
+
+    @classmethod
+    def get_jobs_from_handler_native(cls, handler: CommandHandler) -> Queue:
         """Get full job information on all running / queued jobs"""
         result = handler.execute("qstat -f")
         if result.returncode:
@@ -257,7 +278,7 @@ class SLURM(WorkloadManager):
 
 def get_workload_manager(
     handler: Union[CommandHandler, str], logger: Union[Logger, None] = None
-):
+) -> WorkloadManager:
     if not isinstance(handler, CommandHandler):
         if handler == "local":
             handler = LocalHandler()

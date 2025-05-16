@@ -90,7 +90,8 @@ class PBSJob(dict):
 
     @property
     def status(self):
-        return self.status_dict[self.get("job_state", "U")]
+        state = self.get("job_state", "U")
+        return self.status_dict.get(state, f'unknown - "{state}"')
 
     @property
     def is_running(self):
@@ -99,6 +100,10 @@ class PBSJob(dict):
     @property
     def is_queued(self):
         return self.status == "queued"
+
+    @property
+    def owner(self):
+        return self["Job_Owner"]
 
     @property
     def walltime(self):
@@ -143,6 +148,10 @@ class Queue:
         if isinstance(other, Queue):
             other = other.jobs
         self.jobs.update(other)
+
+    def filter_owner(self, owner: str):
+        # Filter by username, not `user@host`
+        return Queue([j for j in self if j.owner.split("@")[0] == owner])
 
     def __iter__(self):
         # Sort by priority when iterating
