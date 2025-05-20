@@ -1,11 +1,10 @@
 import argparse
+import csv
 import os
 import platform
 import subprocess
 import tempfile
 import uuid
-
-import pandas as pd
 
 from schedtools.managers import get_workload_manager
 from schedtools.shell_handler import ShellHandler
@@ -37,9 +36,15 @@ def queue_status():
     if args.owner:
         queued = queued.filter_owner(args.owner)
 
-    d = pd.DataFrame([dict(j) for j in queued])
+    d = [dict(j) for j in queued]
+    if not len(d):
+        print("No jobs to show")
+        return
     file_path = os.path.join(tempfile.gettempdir(), str(uuid.uuid1())) + ".csv"
-    d.to_csv(file_path)
+    with open(file_path, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=d[0].keys())
+        writer.writeheader()
+        writer.writerows(d)
     open_with_default_prog(file_path)
 
 

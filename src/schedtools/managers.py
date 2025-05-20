@@ -298,7 +298,7 @@ class SLURM(WorkloadManager):
 
     @staticmethod
     def get_jobs_from_handler(handler: CommandHandler):
-        result = handler.execute(
+        handler.execute(
             "squeue --noheader -u $USER -o %i | xargs -I {} scontrol show job {}"
         )
         raise NotImplementedError("SLURM job parsing not implemented currently.")

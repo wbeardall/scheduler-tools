@@ -42,7 +42,6 @@ def _check_status_remote(host, services, show_logs):
     )
     terminal_width, _ = shutil.get_terminal_size()
     print("_" * terminal_width)
-    prefix = "sudo " if show_logs else ""
     # Disable the default systemd pager to prevent hangs
     handler.execute("export SYSTEMD_LESS=-FXR\n")
     for service in registered:

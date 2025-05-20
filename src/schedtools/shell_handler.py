@@ -67,7 +67,7 @@ class ShellHandler(CommandHandler):
     def __del__(self):
         try:
             self.ssh.close()
-        except:
+        except Exception:
             pass
 
     def close(self):
@@ -92,7 +92,6 @@ class ShellHandler(CommandHandler):
         finish = "end of stdOUT buffer. finished with exit status"
         echo_cmd = "echo {} $?".format(finish)
         self.stdin.write(echo_cmd + "\n")
-        shin = self.stdin
         self.stdin.flush()
 
         shout = []

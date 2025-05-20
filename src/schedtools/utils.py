@@ -182,7 +182,9 @@ def retry_on(exception, max_tries=5, allow=None):
         raise TypeError("exception must be Exception or Iterable of Exceptions")
 
     if allow is None:
-        allow = lambda x: True
+
+        def allow(x):
+            return True
 
     def decorator(func):
         @wraps(func)

@@ -65,9 +65,9 @@ class JobScript:
     def parse(cls, script):
         with open(script, "r") as f:
             lines = f.readlines()
-        if any([l.startswith("#PBS") for l in lines]):
+        if any([line.startswith("#PBS") for line in lines]):
             return cls.parse_from_pbs(script)
-        elif any([l.startswith("#SBATCH") for l in lines]):
+        elif any([line.startswith("#SBATCH") for line in lines]):
             return cls.parse_from_slurm(script)
         else:
             raise RuntimeError(
@@ -82,18 +82,18 @@ class JobScript:
         # Ignore lines before directives
         after_directives = False
         script = []
-        for l in lines:
-            if l.startswith("#PBS"):
+        for line in lines:
+            if line.startswith("#PBS"):
                 after_directives = True
-                l = l.strip().split("#PBS -l ")[-1]
+                line = line.strip().split("#PBS -l ")[-1]
                 # Separate, because contains colons
-                if "walltime" in l:
-                    directives["walltime"] = l.split("=")[-1]
+                if "walltime" in line:
+                    directives["walltime"] = line.split("=")[-1]
                 else:
-                    for l in l.split(":"):
-                        directives.__setitem__(*l.split("="))
+                    for part in line.split(":"):
+                        directives.__setitem__(*part.split("="))
             elif after_directives:
-                script.append(l)
+                script.append(line)
 
         return cls(
             nodes=directives["select"],
@@ -113,12 +113,12 @@ class JobScript:
         # Ignore lines before directives
         after_directives = False
         script = []
-        for l in lines:
-            if l.startswith("#SBATCH"):
+        for line in lines:
+            if line.startswith("#SBATCH"):
                 after_directives = True
-                directives.__setitem__(*l.strip().split("--")[-1].split("="))
+                directives.__setitem__(*line.strip().split("--")[-1].split("="))
             elif after_directives:
-                script.append(l)
+                script.append(line)
 
         gpu_alloc = directives["gres"].split(":")
         return cls(
