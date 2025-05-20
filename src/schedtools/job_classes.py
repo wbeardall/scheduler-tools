@@ -18,23 +18,19 @@ class JobClass:
 
 class JobClasses:
     def __init__(self):
-        self.registered_job_classes = {}
+        # Initialize with all job classes registered on the class object
+        self.classes = {
+            el[1].name: el[1] for el in getmembers(self) if isinstance(el[1], JobClass)
+        }
 
     def register(self, job_class: JobClass):
-        self.registered_job_classes[job_class.name] = job_class
+        self.classes[job_class.name] = job_class
 
     def get(self, name: str) -> JobClass:
         try:
             return self.classes[name]
         except KeyError:
             raise KeyError(f"Job class '{name}' not found")
-
-    @property
-    def classes(self):
-        default_job_classes = {
-            el[1].name: el[1] for el in getmembers(self) if isinstance(el[1], JobClass)
-        }
-        return {**default_job_classes, **self.registered_job_classes}
 
     def keys(self):
         return self.classes.keys()
