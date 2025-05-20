@@ -163,3 +163,4 @@ jupyter
 .devcontainer/
 
 .DS_Store
+.schedtools/
