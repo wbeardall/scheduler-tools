@@ -1,10 +1,12 @@
 import json
 import os
-from functools import partial
+import tempfile
+from contextlib import contextmanager
 from logging import Logger
 from typing import Any, Dict, List, Union
 
-from schedtools.core import PBSJob, Queue
+from paramiko import SSHClient
+
 from schedtools.exceptions import (
     JobDeletionError,
     JobSubmissionError,
@@ -13,8 +15,10 @@ from schedtools.exceptions import (
 )
 from schedtools.log import loggers
 from schedtools.managers import WorkloadManager, get_workload_manager
+from schedtools.schemas import Job, Queue
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
-from schedtools.utils import retry_on, systemd_service
+from schedtools.tracking import JobTrackingQueue, default_db_path
+from schedtools.utils import systemd_service
 
 RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
 if systemd_service():
@@ -23,31 +27,32 @@ else:
     CACHE_DIR = os.path.join(os.path.expanduser("~"), ".rerun")
 RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR, "rerun-tracked-cache.json")
 
-# Allow retry in case of traffic corruption
-@retry_on(json.decoder.JSONDecodeError, max_tries=5)
-def get_tracked_from_cluster(handler: CommandHandler):
-    f"""Get tracked job list from file
 
-    Expects tracked jobs to be stored in `{RERUN_TRACKED_FILE}` (json-formatted)
-
-    Args:
-        handler: `ShellHandler` instance to use to query cluster
-    """
+@contextmanager
+def job_tracking_queue(handler: Union[CommandHandler, str, SSHClient]):
     if not isinstance(handler, CommandHandler):
         handler = ShellHandler(handler)
-    result = handler.execute(f"cat {RERUN_TRACKED_FILE}")
-    if result.returncode or not len(result.stdout):
-        return Queue([])
-    raw = json.loads(result.stdout)
-    return Queue([PBSJob(job) for job in raw])
 
+    if isinstance(handler, LocalHandler):
+        yield JobTrackingQueue(db_path=default_db_path)
 
-get_tracked_local = partial(get_tracked_from_cluster, handler=LocalHandler())
+    else:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Pull the tracked database from the cluster
+            temp_path = os.path.join(temp_dir, "db")
+            with handler.open_file(default_db_path, "rb") as f:
+                with open(temp_path, "wb") as wf:
+                    wf.write(f.read())
+
+            yield JobTrackingQueue(db_path=temp_path)
+
+            with handler.open_file(default_db_path, "wb") as f:
+                f.write(open(temp_path, "rb").read())
 
 
 def track_new_jobs(
-    handler: CommandHandler,
-    jobs: Union[PBSJob, List[PBSJob]],
+    handler: Union[CommandHandler, str, SSHClient],
+    jobs: Union[Job, List[Job]],
     logger: Union[Logger, None] = None,
 ):
     """Add new jobs to the tracked list.
@@ -63,27 +68,19 @@ def track_new_jobs(
     Raises:
         RuntimeError: saving tracked jobs failed.
     """
-    if isinstance(jobs, PBSJob):
+    if not isinstance(jobs, list):
         jobs = [jobs]
     if logger is None:
         logger = loggers.current
-    tracked = get_tracked_from_cluster(handler)
-    tracked.extend(jobs)
-    # Update the tracked job list
-    tracked_json = json.dumps([job for job in tracked])
-    result = handler.execute("echo '" + tracked_json + f"\n' > {RERUN_TRACKED_FILE}")
-    if result.returncode:
-        e = RuntimeError(
-            f"Saving tracked jobs failed with status {result.returncode} ({result.stderr.strip()})"
-        )
-        logger.exception(e)
-        raise e
+
+    with job_tracking_queue(handler) as tracked:
+        tracked.register(jobs)
 
 
 def get_tracked_cache():
     if os.path.exists(RERUN_TRACKED_CACHE):
         with open(RERUN_TRACKED_CACHE, "r") as f:
-            cached = Queue([PBSJob(job) for job in json.load(f)])
+            cached = Queue([Job(job) for job in json.load(f)])
     else:
         cached = Queue()
     return cached
@@ -110,6 +107,7 @@ def delete_queued_duplicates(
         handler = ShellHandler(handler)
     if manager is None:
         manager = get_workload_manager(handler, logger or loggers.current)
+
     jobs = manager.get_jobs()
     waiting_scripts = []
     duplicates = Queue()
@@ -155,9 +153,8 @@ def rerun_jobs(
         manager = get_workload_manager(handler, logger)
         queued = manager.get_jobs()
 
-        tracked = get_tracked_from_cluster(handler)
-
-        tracked.update(get_tracked_cache())
+        with job_tracking_queue(handler) as tracked:
+            tracked.register(get_tracked_cache())
         to_rerun = Queue(
             [job for job in tracked if (job not in queued) and manager.was_killed(job)]
         )

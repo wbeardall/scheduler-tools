@@ -10,22 +10,36 @@ ListView {
 
 
 DataTable {
+    height: 1fr;
     width: 100%;
     max-height: 80%;
+    min-height: 20%;
 }
 
 Label {
     padding: 1;
 }
 
-#job-details-container {
+
+ProgressBar {
+    background: $boost;
+    color: $success;
+    margin-top: 1;
+}
+
+
+.screen-container {
     background: $surface;
     border: tall $primary;
     padding: 1 2;
     margin: 1;
 }
 
-#job-title {
+.centered-container {
+    max-width: 80%;
+}
+
+.screen-title {
     color: $primary;
     text-style: bold;
     padding: 1 0;
@@ -57,7 +71,8 @@ Label {
 .button-container {
     height: 3;
     align: right middle;
-    margin-top: 2;
+    margin-top: 1;
+    min-height: 3;
 }
 
 .action-button {
@@ -74,8 +89,6 @@ Label {
     dock: right;
 }
 
-ProgressBar {
-    background: $boost;
-    color: $success;
-    margin-top: 1;
+.pretty-container {
+    border: tall $primary;
 }

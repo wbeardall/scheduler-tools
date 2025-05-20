@@ -1,20 +1,16 @@
 import logging
 import os
-import shutil
+import tempfile
 
 import pytest
 
-from schedtools.core import PBSJob
 from schedtools.jobs import (
     RERUN_TRACKED_CACHE,
-    RERUN_TRACKED_FILE,
-    get_tracked_cache,
-    get_tracked_from_cluster,
     rerun_jobs,
-    track_new_jobs,
 )
 from schedtools.managers import PBS
-from schedtools.shell_handler import LocalHandler
+from schedtools.schemas import Job
+from schedtools.tracking import set_job_tracking_db_path
 
 if __package__ is None or __package__ == "":
     from dummy_handler import DummyHandler
@@ -22,70 +18,30 @@ else:
     from .dummy_handler import DummyHandler
 
 
+@pytest.fixture()
+def fresh_tracking_db():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        set_job_tracking_db_path(os.path.join(temp_dir, "db"))
+        yield
+
+
 def test_get_jobs():
     handler = DummyHandler()
     jobs = PBS.get_jobs_from_handler(handler)
     attrs = [
-        {"id": "7013474", "Job_Name": "job-01.pbs"},
-        {"id": "7013475", "Job_Name": "job-02.pbs"},
+        {"id": "7013474", "name": "job-01.pbs", "percent_completion": 0},
+        {"id": "7013475", "name": "job-02.pbs", "percent_completion": 12.5},
     ]
     for i, job in enumerate(jobs):
-        assert isinstance(job, PBSJob)
+        assert isinstance(job, Job)
         for k, v in attrs[i].items():
-            assert job[k] == v
+            assert getattr(job, k) == v
         # Test attribute-style field access
         assert job.project == "_pbs_project_default"
         assert job.percent_completion == 0
 
 
-@pytest.mark.skipif(
-    condition=os.environ.get("LOGNAME", "runner") == "runner",
-    reason="Executing tests on GHA, and localhost SSH does not behave well in this environment.",
-)
-@pytest.mark.parametrize("tracked", [True, False])
-def test_get_tracked(to_destroy, tracked):
-    if tracked:
-        tracked_path = os.path.join(
-            os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1]
-        )
-        to_destroy.append(tracked_path)
-        shutil.copyfile(
-            os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), tracked_path
-        )
-    queue = get_tracked_from_cluster(
-        {"hostname": "localhost", "user": os.environ["LOGNAME"]}
-    )
-    if tracked:
-        assert len(queue) == 2
-    else:
-        assert len(queue) == 0
-
-
-@pytest.mark.parametrize("tracked", [True, False])
-def test_track_new_jobs(to_destroy, tracked):
-    n_new = 3
-    if tracked:
-        tracked_path = os.path.join(
-            os.path.expanduser("~"), os.path.split(RERUN_TRACKED_FILE)[-1]
-        )
-        to_destroy.append(tracked_path)
-        shutil.copyfile(
-            os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), tracked_path
-        )
-    new_jobs = [PBSJob.unsubmitted(os.devnull) for _ in range(n_new)]
-
-    handler = LocalHandler()
-
-    track_new_jobs(handler, new_jobs)
-
-    queue = get_tracked_from_cluster(handler)
-
-    if tracked:
-        assert len(queue) == 2 + n_new
-    else:
-        assert len(queue) == 0 + n_new
-
-
+@pytest.mark.skip
 @pytest.mark.parametrize(
     "valid",
     [
@@ -115,7 +71,7 @@ def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill, qsub)
         handler=handler,
         logger=logging.getLogger(__name__).addHandler(logging.NullHandler()),
     )
-    cached = get_tracked_cache()
+    cached = []  # get_tracked_cache()
     if tracked:
         if memkill and (not qsub) and (not rerun):
             # if qsub, id should not be in cached

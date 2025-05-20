@@ -5,13 +5,34 @@ import subprocess
 import traceback
 import warnings
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 from functools import wraps
 from getpass import getpass
+from typing import Protocol, Union
 
 import paramiko
 import paramiko.config
 
-def connect_to_host(host_alias, get_password=False, allow_prompt=True, **kwargs) -> paramiko.SSHClient:
+
+def connect_from_attrs(
+    *, hostname: str, user: str, password: str | None, port: int | None = None, **kwargs
+) -> paramiko.SSHClient:
+    port = port or 22
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(
+        hostname=hostname,
+        username=user,
+        port=port,
+        password=password,
+        **kwargs,
+    )
+    return ssh_client
+
+
+def connect_to_host(
+    host_alias, get_password=False, allow_prompt=True, **kwargs
+) -> paramiko.SSHClient:
     """Connect to an SSH host using an alias defined in `~/.ssh/config`.
 
     Args:
@@ -188,3 +209,35 @@ def retry_on(exception, max_tries=5, allow=None):
         return wrapper
 
     return decorator
+
+
+class JobWithId(Protocol):
+    id: str
+
+
+def get_job_id(job: Union[str, JobWithId]):
+    return getattr(job, "id", job)
+
+
+def parse_timeperiod(walltime: str) -> int:
+    hours, minutes, seconds = map(int, walltime.split(":"))
+    return timedelta(hours=hours, minutes=minutes, seconds=seconds)
+
+
+def parse_datetime(datetime_str: str) -> datetime:
+    return datetime.strptime(datetime_str, "%a %b %d %H:%M:%S %Y")
+
+
+def parse_memory(memory: str) -> int:
+    scale_map = {"gb": 1e9, "mb": 1e6, "kb": 1e3, "b": 1}
+    pattern = r"^(\d+)([kmg]?b)?$"
+    match = re.match(pattern, memory)
+    if match:
+        numeric_part = match.group(1)
+        scale = match.group(2)
+        if scale is None:
+            multiplier = 1
+        else:
+            multiplier = scale_map[scale.lower()]
+        return int(numeric_part) * multiplier
+    raise ValueError(f"Unrecognized memory format: {memory}")

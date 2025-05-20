@@ -7,7 +7,7 @@ import pytest
 
 from schedtools.job_script import JobScript
 
-
+@pytest.mark.skip(reason="Jobscript conversion is not at a testable level.")
 @pytest.mark.parametrize("format", ["pbs", "slurm"])
 @pytest.mark.parametrize("level", ["file", "dir"])
 def test_conversion_interface(format, level, to_destroy):

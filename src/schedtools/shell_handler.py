@@ -1,5 +1,6 @@
 import re
 import subprocess
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from typing import Union
 
@@ -9,8 +10,11 @@ from schedtools.utils import connect_to_host
 
 SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
 
-class CommandHandler:
-    pass
+
+class CommandHandler(ABC):
+    @abstractmethod
+    def execute(self, cmd: str, unformat: bool = False) -> SSHResult:
+        pass
 
 
 class LocalHandler(CommandHandler):
@@ -38,6 +42,9 @@ class LocalHandler(CommandHandler):
             returncode=result.returncode,
         )
 
+    def open_file(self, path: str, mode: str = "r"):
+        return open(path, mode)
+
 
 class ShellHandler(CommandHandler):
     def __init__(self, ssh: Union[paramiko.SSHClient, str], **kwargs):
@@ -51,6 +58,11 @@ class ShellHandler(CommandHandler):
         self.login_message = [
             el for el in self.execute("echo").stdout.split("\n") if len(el)
         ][:-1]
+
+    def open_file(self, path: str, mode: str = "r"):
+        file = self.ssh.open_sftp().open(path, mode)
+        file.prefetch()
+        return file
 
     def __del__(self):
         try:

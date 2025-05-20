@@ -27,7 +27,7 @@ def queue_status():
     os.environ["SCHEDTOOLS_PROG"] = "queue-status"
     parser = argparse.ArgumentParser(description=queue_status.__doc__)
     parser.add_argument("host", type=str, help="Host alias in `~/.ssh/config`.")
-    parser.add_argument('--owner', type=str, help='Only show jobs owned by this user')
+    parser.add_argument("--owner", type=str, help="Only show jobs owned by this user")
 
     args = parser.parse_args()
 

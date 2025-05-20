@@ -1,11 +1,10 @@
 import json
 import re
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 from functools import partialmethod
 from logging import Logger
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
-from schedtools.core import PBSJob, Queue
 from schedtools.exceptions import (
     JobDeletionError,
     JobSubmissionError,
@@ -13,15 +12,16 @@ from schedtools.exceptions import (
     QueueFullError,
 )
 from schedtools.log import loggers
+from schedtools.schemas import Job, Queue
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
-from schedtools.utils import retry_on
+from schedtools.utils import get_job_id, retry_on
 
 
 class WorkloadManager(ABC):
-    manager_check_cmd = None
+    list_jobs_cmd = None
     submit_cmd = None
     delete_cmd = None
-    get_jobs_json_cmd = None
+    list_jobs_cmd = None
 
     def __init__(
         self,
@@ -36,20 +36,22 @@ class WorkloadManager(ABC):
         self.logger = logger
 
     @abstractmethod
-    def get_storage_stats(self):
-        ...
+    def get_storage_stats(self): ...
+
+    def query_jobs(self, job_ids: Union[str, List[str]]) -> Queue:
+        return self.get_jobs_from_handler(self.handler).filter_id(job_ids)
 
     @classmethod
     @retry_on(RecursionError, max_tries=2)
     def is_valid(cls, handler: CommandHandler):
-        result = handler.execute(cls.manager_check_cmd)
+        result = handler.execute(cls.list_jobs_cmd)
         if result.returncode == 0:
             return True
         elif result.returncode == 127:
             return False
         else:
             raise RuntimeError(
-                f"Command `{cls.manager_check_cmd}` failed with status {result.returncode}"
+                f"Command `{cls.list_jobs_cmd}` failed with status {result.returncode}"
             )
 
     def get_jobs(self):
@@ -58,67 +60,94 @@ class WorkloadManager(ABC):
 
     @classmethod
     @abstractmethod
-    def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue:
-        ...
+    def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue: ...
 
-    def submit_job(self, jobscript_path: str):
-        result = self.handler.execute(f"{self.submit_cmd} {jobscript_path}")
+    def submit_job(
+        self,
+        jobscript_path: str,
+        *,
+        express_queue: Union[str, None] = None,
+        project: Union[str, None] = None,
+    ):
+        args = []
+        if project is not None:
+            # If project is set, default to `express` queue.
+            # NOTE: This is correct for ICL CX3 Phase I. It should be changed
+            # for other clusters.
+            express_queue = express_queue or "express"
+            args.extend(["-q", express_queue, "-P", project])
+
+        result = self.handler.execute(
+            f"{self.submit_cmd} {' '.join(args)} {jobscript_path}"
+        )
         if result.returncode:
             msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
-            self.logger.info(msg)
+            self.logger.error(msg)
             raise JobSubmissionError(msg)
 
-    def submit_or_track(self, jobscript_path: str):
+    @abstractmethod
+    def elevate_job(
+        self,
+        job: Job,
+        *,
+        express_queue: Union[str, None] = None,
+        project: Union[str, None] = None,
+    ) -> None: ...
+
+    def submit_or_track(
+        self,
+        jobscript_path: str,
+        *,
+        express_queue: Union[str, None] = None,
+        project: Union[str, None] = None,
+    ):
         from schedtools.jobs import track_new_jobs
 
         try:
-            self.submit_job(jobscript_path)
+            self.submit_job(
+                jobscript_path, express_queue=express_queue, project=project
+            )
         except JobSubmissionError:
-            self.logger.info(f"Tracking unsubmitted job ({jobscript_path}).")
-            job = PBSJob.unsubmitted(jobscript_path)
+            self.logger.warning(
+                f"Failed to submit job, adding to tracked set ({jobscript_path})."
+            )
+            job = Job.unsubmitted(jobscript_path)
             track_new_jobs(self.handler, job, logger=self.logger)
 
-    def delete_job(self, job: Union[str, PBSJob]):
-        if isinstance(job, str):
-            job_id = job
-        else:
-            job_id = job.id
+    def delete_job(self, job: Union[str, Job]):
+        job_id = get_job_id(job)
         result = self.handler.execute(f"{self.delete_cmd} {job_id}")
         if result.returncode:
             msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr.strip()})"
-            self.logger.info(msg)
+            self.logger.error(msg)
             raise JobDeletionError(msg)
 
-    def was_killed(self, job: PBSJob):
+    def was_killed(self, job: Job):
         return self.was_killed_walltime(job) or self.was_killed_mem(job)
 
     @abstractmethod
-    def was_killed_reason(self, job: PBSJob):
-        ...
+    def was_killed_reason(self, job: Job): ...
 
     @abstractmethod
-    def was_killed_mem(self, job: PBSJob):
-        ...
+    def was_killed_mem(self, job: Job): ...
 
     @abstractmethod
-    def was_killed_walltime(self, job: PBSJob):
-        ...
+    def was_killed_walltime(self, job: Job): ...
 
     @abstractmethod
-    def rerun_job(self, job: PBSJob):
-        ...
+    def rerun_job(self, job: Job): ...
 
 
 class UCL(WorkloadManager):
     # UCL cluster uses a variant of PBS, with slightly different commands
-    manager_check_cmd = "jobhist"
+    list_jobs_cmd = "jobhist"
     submit_cmd = "qsub"
     delete_cmd = "qdel"
     # TODO: Implement rest of functionality
 
 
 class PBS(WorkloadManager):
-    manager_check_cmd = "qstat"
+    list_jobs_cmd = "qstat -fF json"
     submit_cmd = "qsub"
     delete_cmd = "qdel"
     qrerun_allowed = True
@@ -145,72 +174,77 @@ class PBS(WorkloadManager):
             )
         return stats
 
-    def submit_job(self, jobscript_path: str):
-        result = self.handler.execute(f"{self.submit_cmd} {jobscript_path}")
+    def submit_job(
+        self,
+        jobscript_path: str,
+        *,
+        express_queue: Union[str, None] = None,
+        project: Union[str, None] = None,
+    ):
+        args = []
+        if project is not None:
+            # If project is set, default to `express` queue.
+            # NOTE: This is correct for ICL CX3 Phase I. It should be changed
+            # for other clusters.
+            express_queue = express_queue or "express"
+            args.extend(["-q", express_queue, "-P", project])
+
+        result = self.handler.execute(
+            f"{self.submit_cmd} {' '.join(args)} {jobscript_path}"
+        )
         if result.returncode:
             msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
-            self.logger.info(msg)
+            self.logger.error(msg)
             # Number of jobs exceeds user's limit
             if result.returncode == 38:
                 raise QueueFullError(msg)
             raise JobSubmissionError(msg)
 
+    def elevate_job(
+        self,
+        job: Job,
+        *,
+        express_queue: Union[str, None] = None,
+        project: Union[str, None] = None,
+    ) -> None:
+        current_status = job.status
+        if current_status != "queued":
+            raise ValueError(f"Cannot elevate job in status {current_status}")
+        try:
+            self.submit_job(
+                job.jobscript_path, express_queue=express_queue, project=project
+            )
+            self.logger.info(
+                f"Elevated job {job.id} to queue '{express_queue}' with project '{project}'. Deleting original job."
+            )
+            self.delete_job(job)
+        except Exception as e:
+            self.logger.error(
+                f"Failed to elevate job {job.id} to queue '{express_queue}' with project '{project}': {e}"
+            )
+
+    def query_jobs(self, job_ids: Union[str, List[str]]) -> Queue:
+        if isinstance(job_ids, str):
+            job_ids = [job_ids]
+        result = self.handler.execute(f"{self.list_jobs_cmd} {' '.join(job_ids)}")
+        if result.returncode:
+            raise RuntimeError(
+                f"{self.list_jobs_cmd} failed with returncode {result.returncode}"
+            )
+        d = json.loads(result.stdout)
+        return Queue.parse(d["Jobs"])
+
     @classmethod
     def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue:
-        if cls.get_jobs_json_cmd:
-            return cls.get_jobs_from_handler_json(handler)
-        else:
-            return cls.get_jobs_from_handler_native(handler)
-
-    @classmethod
-    def get_jobs_from_handler_json(cls, handler: CommandHandler) -> Queue:
-        result = handler.execute(cls.get_jobs_json_cmd)
+        result = handler.execute(cls.list_jobs_cmd)
         if result.returncode:
-            raise RuntimeError(f"{cls.get_jobs_json_cmd} failed with returncode {result.returncode}")
+            raise RuntimeError(
+                f"{cls.list_jobs_cmd} failed with returncode {result.returncode}"
+            )
         data = json.loads(result.stdout)
-        jobs = []
-        for id, job_data in data.items():
-            jobs.append(PBSJob({**job_data, "id": id}))
-        return Queue(jobs)
+        return Queue.parse(data.get("Jobs", {}))
 
-    @classmethod
-    def get_jobs_from_handler_native(cls, handler: CommandHandler) -> Queue:
-        """Get full job information on all running / queued jobs"""
-        result = handler.execute("qstat -f")
-        if result.returncode:
-            raise RuntimeError(f"qstat failed with returncode {result.returncode}")
-        data = result.stdout.split("\n")
-        jobs = []
-        current_job = PBSJob()
-        current_key = ""
-        current_indent = 0
-        for line in data:
-            if not len(line.strip()):
-                continue
-            if line.startswith("Job Id: "):
-                if current_job:
-                    jobs.append(current_job)
-                current_job = PBSJob(
-                    {"id": re.findall("(?<=Job Id: )[0-9]+", line.strip())[0]}
-                )
-                current_key = ""
-                current_indent = 0
-            elif " = " in line:
-                indent = line.index(" ") - len(line.lstrip("\t"))
-                if indent > current_indent:
-                    current_job[current_key] += line.strip()
-                    current_indent = indent
-                else:
-                    key, val = line.strip().split(" = ")
-                    current_job[key] = val
-                    current_key = key
-                    current_indent = 0
-            elif current_key:
-                current_job[current_key] += line.strip()
-        jobs.append(current_job)
-        return Queue(jobs)
-
-    def rerun_job(self, job: PBSJob):
+    def rerun_job(self, job: Job):
         if self.qrerun_allowed:
             result = self.handler.execute(f"qrerun {job.id}")
 
@@ -244,7 +278,7 @@ class PBS(WorkloadManager):
         else:
             self.logger.info(f"Rerunning job {job.id} ({job.name})")
 
-    def was_killed_reason(self, job: PBSJob, reason):
+    def was_killed_reason(self, job: Job, reason):
         result = self.handler.execute(f"tail {job.error_path}")
         if result.returncode:
             # TODO: Make more robust
@@ -258,7 +292,7 @@ class PBS(WorkloadManager):
 
 
 class SLURM(WorkloadManager):
-    manager_check_cmd = "sinfo"
+    list_jobs_cmd = "sinfo"
     submit_cmd = "sbatch --requeue"
     delete_cmd = "scancel"
 
@@ -269,7 +303,7 @@ class SLURM(WorkloadManager):
         )
         raise NotImplementedError("SLURM job parsing not implemented currently.")
 
-    def rerun_job(self, job: PBSJob):
+    def rerun_job(self, job: Job):
         # TODO: implement
         # afternotok ensures job is only requeued if it failed (i.e. timed out)
         # sbatch --dependency=afternotok:<jobid> <script>

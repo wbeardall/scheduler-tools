@@ -1,12 +1,32 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 
-[tool.docformatter]
-recursive = true
-in-place = true
-wrap-summaries = 82
-blank = true
-syntax = "google"
+[project]
+name = "scheduler-tools"
+version = "0.0.1"
+description = "Basic tools for automating some PBS work. In progress, and potentially unsafe."
+readme = "README.md"
+requires-python = ">=3.8.1"
+dependencies = [
+    "apscheduler>=3.11.0",
+    "paramiko>=3.5.1",
+    "python-daemon>=3.1.2",
+    "regex>=2024.11.6",
+    "rich>=14.0.0",
+]
+
+[project.optional-dependencies]
+ui = [
+  "textual>=3.2.0",
+]
+
+
+[dependency-groups]
+dev = [
+  "pytest>=6.0",
+  "pytest-cov>=4.0",
+]
+
 
 [tool.pytest.ini_options]
 addopts = "--cov=schedtools"
@@ -16,29 +36,3 @@ markers = [
 testpaths = [
     "test",
 ]
-
-[tool.black]
-line-length = 88
-target_version = ['py37', 'py38', 'py39', 'py310']
-include = '\.pyi?$'
-exclude = '''
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | _build
-    | buck-out
-    | build
-    | dist
-    | submodules
-  )/
-  | versioneer.py
-)
-'''
-
-[tool.isort]
-profile = "black"

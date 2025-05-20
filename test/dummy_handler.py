@@ -116,6 +116,10 @@ with open(os.path.join(os.path.dirname(__file__), "dummy_tracked.json"), "r") as
     dummy_tracked = f.read()
 
 
+with open(os.path.join(os.path.dirname(__file__), "qstat_example.json"), "r") as f:
+    dummy_qstat = f.read()
+
+
 class DummyHandler(ShellHandler):
     def __init__(
         self,
@@ -131,9 +135,9 @@ class DummyHandler(ShellHandler):
     ):
         self.responses = {
             "qstat": SSHResult("", "", "", 0) if valid else SSHResult("", "", "", 1),
-            "qstat -f": SSHResult("", dummy_queue, "", 0)
+            "qstat -fF json": SSHResult("", dummy_qstat, "", 0)
             if jobs
-            else SSHResult("", "", "", 0),
+            else SSHResult("", "{}", "", 0),
             f"cat {RERUN_TRACKED_FILE}": SSHResult("", dummy_tracked, "", 0)
             if tracked
             else SSHResult("", "", "", 1),
@@ -167,6 +171,9 @@ class DummyHandler(ShellHandler):
             "   Ephemeral  Data:  1GB of 109.95TB (0%) ",
             "              Files: 0k of 20.97M (0%)  ",
         ]
+
+    def open_file(self, path: str, mode: str = "r"):
+        return open(path, mode)
 
     def execute(self, command):
         if command in self.responses:
