@@ -29,7 +29,10 @@ class JobTrackingConnection:
 
     def get(self) -> sqlite3.Connection:
         if self.conn is None:
-            self.conn = sqlite3.connect(get_job_tracking_db_path())
+            path = get_job_tracking_db_path()
+            if not os.path.exists(os.path.dirname(path)):
+                os.makedirs(os.path.dirname(path))
+            self.conn = sqlite3.connect(path)
             ensure_table(self.conn)
             self.conn.row_factory = sqlite3.Row
         return self.conn
