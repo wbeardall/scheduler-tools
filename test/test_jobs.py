@@ -29,8 +29,8 @@ def test_get_jobs():
     handler = DummyHandler()
     jobs = PBS.get_jobs_from_handler(handler)
     attrs = [
-        {"id": "7013474", "name": "job-01.pbs", "percent_completion": 0},
-        {"id": "7013475", "name": "job-02.pbs", "percent_completion": 12.5},
+        {"scheduler_id": "7013474", "name": "job-01.pbs", "percent_completion": 0},
+        {"scheduler_id": "7013475", "name": "job-02.pbs", "percent_completion": 12.5},
     ]
     for i, job in enumerate(jobs):
         assert isinstance(job, Job)

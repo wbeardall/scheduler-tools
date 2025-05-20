@@ -2,9 +2,14 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, Iterator, List, Union
+from typing import Iterator, List, Union
 
-from schedtools.utils import get_job_id, parse_datetime, parse_memory, parse_timeperiod
+from schedtools.consts import experiment_path_key, job_id_key
+from schedtools.utils import (
+    parse_datetime,
+    parse_memory,
+    parse_timeperiod,
+)
 
 
 class JobState(Enum):
@@ -17,6 +22,8 @@ class JobState(Enum):
     SUSPENDED = "suspended"
     UNKNOWN = "unknown"
     UNSUBMITTED = "unsubmitted"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
     @classmethod
     def parse(cls, state: str) -> "JobState":
@@ -59,7 +66,7 @@ class ResourceRequest:
     place: str
 
     # Priority requested
-    priority: int
+    priority: Union[int, None]
 
     # Select statement from job script
     select_statement: str
@@ -75,7 +82,8 @@ class ResourceRequest:
             ngpus=resource_list.get("ngpus", 0),
             node_count=resource_list["nodect"],
             place=resource_list["place"],
-            priority=resource_list["priority_job"],
+            # Older PBS versions don't have priority_job
+            priority=resource_list.get("priority_job", None),
             select_statement=resource_list["select"],
             walltime=parse_timeperiod(resource_list["walltime"]),
         )
@@ -133,6 +141,7 @@ class ResourceUsage:
 @dataclass
 class JobSpec:
     id: str
+    experiment_path: str
     state: JobState
     queue: Union[str, None]
     project: Union[str, None]
@@ -146,6 +155,7 @@ class JobSpec:
     def from_sqlite(cls, data: dict) -> "JobSpec":
         return cls(
             id=data["id"],
+            experiment_path=data["experiment_path"],
             state=JobState(data["state"]),
             queue=data["queue"],
             project=data["project"],
@@ -155,13 +165,15 @@ class JobSpec:
     @classmethod
     def from_unsubmitted(
         cls,
-        jobscript_path: str,
         *,
+        jobscript_path: str,
+        experiment_path: str,
         queue: Union[str, None] = None,
         project: Union[str, None] = None,
     ) -> "JobSpec":
         return cls(
             id=str(uuid.uuid4()),
+            experiment_path=experiment_path,
             state=JobState.UNSUBMITTED,
             jobscript_path=jobscript_path,
             queue=queue,
@@ -171,6 +183,7 @@ class JobSpec:
     def to_sqlite(self) -> dict:
         return {
             "id": self.id,
+            "experiment_path": self.experiment_path,
             "state": self.state.value,
             "queue": self.queue,
             "project": self.project,
@@ -181,6 +194,9 @@ class JobSpec:
 @dataclass
 class Job(JobSpec):
     """A job from a scheduler."""
+
+    # Scheduler-defined job ID
+    scheduler_id: str
 
     # Job name
     name: str
@@ -234,7 +250,7 @@ class Job(JobSpec):
     job_details: dict
 
     @classmethod
-    def parse(cls, id: str, job: dict) -> "Job":
+    def parse(cls, scheduler_id: str, job: dict) -> "Job":
         if "resources_used" in job:
             resource_usage = ResourceUsage.parse(job["resources_used"])
         else:
@@ -249,8 +265,15 @@ class Job(JobSpec):
         else:
             submit_arguments = None
             jobscript_path = None
+        # Attempt to get the job ID from the job's environment variables
+        variables: dict = job.get("Variable_List", {})
+        id = variables.get(job_id_key, None)
+        experiment_path = variables.get(experiment_path_key, None)
+
         return cls(
             id=id,
+            experiment_path=experiment_path,
+            scheduler_id=scheduler_id,
             name=job["Job_Name"],
             owner=job["Job_Owner"],
             state=JobState.parse(job.get("job_state", "unknown")),
@@ -308,35 +331,43 @@ class Job(JobSpec):
 
 
 class Queue:
-    jobs: Dict[str, Job]
+    jobs: List[Job]
 
     def __init__(self, jobs: List[Job]):
-        self.jobs = {j.id: j for j in jobs}
+        self.jobs = jobs
 
     @classmethod
     def parse(cls, query_response: dict) -> "Queue":
         return cls([Job.parse(id, job) for id, job in query_response.items()])
 
     def __iter__(self) -> Iterator[Job]:
-        return iter(self.jobs.values())
+        return iter(self.jobs)
 
     def __getitem__(self, id: str) -> Job:
-        return self.jobs[id]
+        for job in self.jobs:
+            if job.id == id or job.scheduler_id == id:
+                return job
+        raise KeyError(f"Job with ID '{id}' not found in queue")
+
+    def __contains__(self, job: Union[str, Job]) -> bool:
+        if isinstance(job, Job):
+            job = job.id
+        for j in self.jobs:
+            if j.id == job or j.scheduler_id == job:
+                return True
+        return False
 
     def __len__(self) -> int:
         return len(self.jobs)
 
-    def __contains__(self, job: Union[str, Job]) -> bool:
-        return get_job_id(job) in self.jobs
-
     def get(self, id: str) -> Job:
-        return self.jobs[id]
+        return self.__getitem__(id)
 
-    def pop(self, job: Union[str, Job]) -> Job:
-        job_id = get_job_id(job)
-        if job_id not in self.jobs:
-            raise KeyError(f"Job '{job_id}' not found in queue")
-        return self.jobs.pop(job_id)
+    def pop(self, job: str) -> Job:
+        for i, j in enumerate(self.jobs):
+            if j.id == job or j.scheduler_id == job:
+                return self.jobs.pop(i)
+        raise KeyError(f"Job with ID '{job}' not found in queue")
 
     def count(self, status: JobState) -> int:
         return sum(1 for job in self if job.state == status)

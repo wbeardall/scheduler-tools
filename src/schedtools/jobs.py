@@ -34,7 +34,7 @@ def job_tracking_queue(handler: Union[CommandHandler, str, SSHClient]):
         handler = ShellHandler(handler)
 
     if isinstance(handler, LocalHandler):
-        yield JobTrackingQueue(db_path=default_db_path)
+        yield JobTrackingQueue(db=default_db_path)
 
     else:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -44,7 +44,7 @@ def job_tracking_queue(handler: Union[CommandHandler, str, SSHClient]):
                 with open(temp_path, "wb") as wf:
                     wf.write(f.read())
 
-            yield JobTrackingQueue(db_path=temp_path)
+            yield JobTrackingQueue(db=temp_path)
 
             with handler.open_file(default_db_path, "wb") as f:
                 f.write(open(temp_path, "rb").read())

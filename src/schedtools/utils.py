@@ -217,8 +217,16 @@ class JobWithId(Protocol):
     id: str
 
 
+class JobWithSchedulerId(Protocol):
+    scheduler_id: str
+
+
 def get_job_id(job: Union[str, JobWithId]):
     return getattr(job, "id", job)
+
+
+def get_scheduler_id(job: Union[str, JobWithId]):
+    return getattr(job, "scheduler_id", job)
 
 
 def parse_timeperiod(walltime: str) -> int:

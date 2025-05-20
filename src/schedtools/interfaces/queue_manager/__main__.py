@@ -373,7 +373,7 @@ class JobBrowserScreen(Screen):
         for job in queued_jobs:
             table.add_row(
                 *[self.prettify_enum_only(getattr(job, col)) for col in columns],
-                key=job.id,
+                key=job.scheduler_id,
             )
 
     @staticmethod

@@ -1,10 +1,12 @@
 import json
 import re
+import sqlite3
 from abc import ABC, abstractmethod
 from functools import partialmethod
 from logging import Logger
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
+from schedtools.consts import experiment_path_key, job_id_key
 from schedtools.exceptions import (
     JobDeletionError,
     JobSubmissionError,
@@ -12,9 +14,10 @@ from schedtools.exceptions import (
     QueueFullError,
 )
 from schedtools.log import loggers
-from schedtools.schemas import Job, JobSpec, Queue
+from schedtools.schemas import Job, JobSpec, JobState, Queue
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
-from schedtools.utils import get_job_id, retry_on
+from schedtools.tracking import default_tracking_connection, upsert_jobs
+from schedtools.utils import get_scheduler_id, retry_on
 
 
 class WorkloadManager(ABC):
@@ -64,63 +67,42 @@ class WorkloadManager(ABC):
 
     def submit_job(
         self,
-        jobscript_path: str,
+        job: JobSpec,
         *,
-        express_queue: Union[str, None] = None,
-        project: Union[str, None] = None,
+        conn: Optional[sqlite3.Connection] = None,
     ):
-        args = []
-        if project is not None:
+        args = [
+            "-v",
+            f"{job_id_key}={job.id}",
+            f"{experiment_path_key}={job.experiment_path}",
+        ]
+        if job.project is not None:
             # If project is set, default to `express` queue.
             # NOTE: This is correct for ICL CX3 Phase I. It should be changed
             # for other clusters.
-            express_queue = express_queue or "express"
-            args.extend(["-q", express_queue, "-P", project])
+            express_queue = job.queue or "express"
+            args.extend(["-q", express_queue, "-P", job.project])
 
         result = self.handler.execute(
-            f"{self.submit_cmd} {' '.join(args)} {jobscript_path}"
+            f"{self.submit_cmd} {' '.join(args)} {job.jobscript_path}"
         )
+
+        job.state = JobState.QUEUED if result.returncode == 0 else JobState.UNSUBMITTED
+
+        upsert_jobs(
+            conn or default_tracking_connection.get(), [job], on_conflict="update"
+        )
+
         if result.returncode:
-            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
+            msg = f"Submission of jobscript at {job.jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.error(msg)
             raise JobSubmissionError(msg)
 
-    @abstractmethod
-    def elevate_job(
-        self,
-        job: Job,
-        *,
-        express_queue: Union[str, None] = None,
-        project: Union[str, None] = None,
-    ) -> None: ...
-
-    def submit_or_track(
-        self,
-        jobscript_path: str,
-        *,
-        express_queue: Union[str, None] = None,
-        project: Union[str, None] = None,
-    ):
-        from schedtools.jobs import track_new_jobs
-
-        try:
-            self.submit_job(
-                jobscript_path, express_queue=express_queue, project=project
-            )
-        except JobSubmissionError:
-            self.logger.warning(
-                f"Failed to submit job, adding to tracked set ({jobscript_path})."
-            )
-            job = JobSpec.from_unsubmitted(
-                jobscript_path, queue=express_queue, project=project
-            )
-            track_new_jobs(self.handler, job, logger=self.logger)
-
     def delete_job(self, job: Union[str, Job]):
-        job_id = get_job_id(job)
-        result = self.handler.execute(f"{self.delete_cmd} {job_id}")
+        scheduler_id = get_scheduler_id(job)
+        result = self.handler.execute(f"{self.delete_cmd} {scheduler_id}")
         if result.returncode:
-            msg = f"Deletion of job {job_id} failed with status {result.returncode} ({result.stderr.strip()})"
+            msg = f"Deletion of job with scheduler ID {scheduler_id} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.error(msg)
             raise JobDeletionError(msg)
 
@@ -175,55 +157,6 @@ class PBS(WorkloadManager):
                 ),
             )
         return stats
-
-    def submit_job(
-        self,
-        jobscript_path: str,
-        *,
-        express_queue: Union[str, None] = None,
-        project: Union[str, None] = None,
-    ):
-        args = []
-        if project is not None:
-            # If project is set, default to `express` queue.
-            # NOTE: This is correct for ICL CX3 Phase I. It should be changed
-            # for other clusters.
-            express_queue = express_queue or "express"
-            args.extend(["-q", express_queue, "-P", project])
-
-        result = self.handler.execute(
-            f"{self.submit_cmd} {' '.join(args)} {jobscript_path}"
-        )
-        if result.returncode:
-            msg = f"Submission of jobscript at {jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
-            self.logger.error(msg)
-            # Number of jobs exceeds user's limit
-            if result.returncode == 38:
-                raise QueueFullError(msg)
-            raise JobSubmissionError(msg)
-
-    def elevate_job(
-        self,
-        job: Job,
-        *,
-        express_queue: Union[str, None] = None,
-        project: Union[str, None] = None,
-    ) -> None:
-        current_status = job.status
-        if current_status != "queued":
-            raise ValueError(f"Cannot elevate job in status {current_status}")
-        try:
-            self.submit_job(
-                job.jobscript_path, express_queue=express_queue, project=project
-            )
-            self.logger.info(
-                f"Elevated job {job.id} to queue '{express_queue}' with project '{project}'. Deleting original job."
-            )
-            self.delete_job(job)
-        except Exception as e:
-            self.logger.error(
-                f"Failed to elevate job {job.id} to queue '{express_queue}' with project '{project}': {e}"
-            )
 
     def query_jobs(self, job_ids: Union[str, List[str]]) -> Queue:
         if isinstance(job_ids, str):
