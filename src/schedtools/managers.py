@@ -73,9 +73,14 @@ class WorkloadManager(ABC):
     ):
         args = [
             "-v",
-            f"{job_id_key}={job.id}",
-            "-v",
-            f"{experiment_path_key}={job.experiment_path}",
+            # In PBS, environment variables must be passed as a comma-separated
+            # list.
+            ",".join(
+                [
+                    f"{job_id_key}={job.id}",
+                    f"{experiment_path_key}={job.experiment_path}",
+                ]
+            ),
         ]
         if job.project is not None:
             # If project is set, default to `express` queue.

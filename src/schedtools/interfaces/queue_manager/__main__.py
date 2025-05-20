@@ -383,17 +383,32 @@ class JobBrowserScreen(Screen):
         return s
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.app.push_screen(JobDetailScreen(state=self.state, job_id=event.row_key))
+        self.app.push_screen(
+            JobDetailScreen(
+                state=self.state,
+                browser_handle=self,
+                job_id=event.row_key,
+            )
+        )
 
 
 class JobScriptScreen(Screen):
     state: ManagerState
+    browser_handle: JobBrowserScreen
     job: Job
 
-    def __init__(self, *args, state: ManagerState, job_id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        state: ManagerState,
+        browser_handle: JobBrowserScreen,
+        job_id: str,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.state = state
         self.job = self.state.get_job(job_id)
+        self.browser_handle = browser_handle
 
 
 class JobDetailScreen(JobScriptScreen):
@@ -454,19 +469,29 @@ class JobDetailScreen(JobScriptScreen):
                     classes="left-button",
                 )
                 yield Static()
+                # yield Button(
+                #     "⚡️ Elevate Job",
+                #     variant="warning",
+                #     id="job-detail-elevate-button",
+                #     classes="right-button",
+                # )
                 yield Button(
-                    "⚡️ Elevate Job",
-                    variant="warning",
-                    id="job-detail-elevate-button",
+                    "🗑️ Delete Job",
+                    variant="error",
+                    id="job-detail-delete-button",
                     classes="right-button",
                 )
-                # yield Button("🗑️ Delete Job", variant="error", id="job-detail-delete-button", classes="right-button")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "job-detail-delete-button":
-            # TODO: Implement job deletion
-            self.notify("Job deletion not yet implemented")
+            try:
+                self.state.workload_manager.delete_job(self.job)
+            except Exception as e:
+                self.notify(f"❌ Error deleting job: {e}")
+            self.state.evict_current_queue()
+            self.browser_handle.populate_table()
+            self.app.pop_screen()
         elif event.button.id == "job-detail-back-button":
             self.app.pop_screen()
         elif event.button.id == "job-detail-elevate-button":
