@@ -12,7 +12,7 @@ from schedtools.exceptions import (
     QueueFullError,
 )
 from schedtools.log import loggers
-from schedtools.schemas import Job, Queue
+from schedtools.schemas import Job, JobSpec, Queue
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
 from schedtools.utils import get_job_id, retry_on
 
@@ -111,7 +111,9 @@ class WorkloadManager(ABC):
             self.logger.warning(
                 f"Failed to submit job, adding to tracked set ({jobscript_path})."
             )
-            job = Job.unsubmitted(jobscript_path)
+            job = JobSpec.from_unsubmitted(
+                jobscript_path, queue=express_queue, project=project
+            )
             track_new_jobs(self.handler, job, logger=self.logger)
 
     def delete_job(self, job: Union[str, Job]):
