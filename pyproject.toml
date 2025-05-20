@@ -20,6 +20,19 @@ ui = [
   "textual>=3.2.0",
 ]
 
+[project.scripts]
+check-status = "schedtools.check_status:check_status"
+clear-logs = "schedtools.clear_logs:clear_logs"
+convert-jobscripts = "schedtools.convert_jobscripts:convert_jobscripts"
+create-smtp-credentials = "schedtools.smtp:create_credentials"
+delete-duplicate-jobs = "schedtools.delete_duplicate_jobs:delete_duplicate_jobs"
+queue-manager = "schedtools.interfaces.queue_manager.__main__:main"
+remote-command = "schedtools.remote_command:remote_command"
+remove-service = "schedtools.remove_service:remove_service"
+rerun = "schedtools.rerun:rerun"
+schedtools-help = "schedtools.help:help"
+storage-tracker = "schedtools.storage_tracker:storage_tracker"
+
 
 [dependency-groups]
 dev = [

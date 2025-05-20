@@ -21,9 +21,7 @@ from textual.widgets import (
 )
 from textual.worker import Worker, WorkerState
 
-from schedtools.interfaces.manager.state import Job, ManagerState
-
-# ./.venv/bin/python src/schedtools/interfaces/manager
+from schedtools.interfaces.queue_manager.state import Job, ManagerState
 
 
 class ConnectorScreen(Screen):
@@ -567,6 +565,10 @@ def prettify(s: Union[str, Enum]) -> str:
     return s.replace("_", " ").title()
 
 
-if __name__ == "__main__":
+def main():
     app = ManagerApp()
     app.run()
+
+
+if __name__ == "__main__":
+    main()
