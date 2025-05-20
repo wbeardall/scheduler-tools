@@ -74,6 +74,7 @@ class WorkloadManager(ABC):
         args = [
             "-v",
             f"{job_id_key}={job.id}",
+            "-v",
             f"{experiment_path_key}={job.experiment_path}",
         ]
         if job.project is not None:
