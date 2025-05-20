@@ -155,8 +155,8 @@ class JobSpec:
     @classmethod
     def from_unsubmitted(
         cls,
-        *,
         jobscript_path: str,
+        *,
         queue: Union[str, None] = None,
         project: Union[str, None] = None,
     ) -> "JobSpec":
