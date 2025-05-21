@@ -10,7 +10,7 @@ from schedtools.jobs import (
 )
 from schedtools.managers import PBS
 from schedtools.schemas import Job
-from schedtools.tracking import set_job_tracking_db_path
+from schedtools.sql import set_job_tracking_db_path
 
 if __package__ is None or __package__ == "":
     from dummy_handler import DummyHandler

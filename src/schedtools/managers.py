@@ -6,6 +6,7 @@ from functools import partialmethod
 from logging import Logger
 from typing import Any, Dict, List, Optional, Union
 
+from schedtools.clusters import Cluster
 from schedtools.consts import experiment_path_key, job_id_key
 from schedtools.exceptions import (
     JobDeletionError,
@@ -16,7 +17,10 @@ from schedtools.exceptions import (
 from schedtools.log import loggers
 from schedtools.schemas import Job, JobSpec, JobState, Queue
 from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
-from schedtools.tracking import default_tracking_connection, upsert_jobs
+from schedtools.sql import default_tracking_connection, upsert_jobs
+from schedtools.tracking import (
+    JobTrackingQueue,
+)
 from schedtools.utils import get_scheduler_id, retry_on
 
 
@@ -65,12 +69,18 @@ class WorkloadManager(ABC):
     @abstractmethod
     def get_jobs_from_handler(cls, handler: CommandHandler) -> Queue: ...
 
-    def submit_job(
-        self,
-        job: JobSpec,
-        *,
-        conn: Optional[sqlite3.Connection] = None,
-    ):
+    def get_cluster_jobs_from_db(self, filter_cluster: bool = False) -> Queue:
+        queue = JobTrackingQueue.from_handler(self.handler)
+        if filter_cluster:
+            cluster = Cluster.from_handler(self.handler)
+            if cluster != Cluster.UNKNOWN:
+                queue = queue.filter_cluster(cluster)
+            return queue
+        else:
+            # Return a vanilla queue (not job tracking, for serializability)
+            return Queue(queue.jobs)
+
+    def _submit_job_impl(self, job: JobSpec):
         args = [
             "-v",
             # In PBS, environment variables must be passed as a comma-separated
@@ -93,6 +103,16 @@ class WorkloadManager(ABC):
             f"{self.submit_cmd} {' '.join(args)} {job.jobscript_path}"
         )
 
+        return result
+
+    def submit_job(
+        self,
+        job: JobSpec,
+        *,
+        conn: Optional[sqlite3.Connection] = None,
+    ):
+        result = self._submit_job_impl(job)
+
         job.state = JobState.QUEUED if result.returncode == 0 else JobState.UNSUBMITTED
 
         upsert_jobs(
@@ -103,6 +123,20 @@ class WorkloadManager(ABC):
             msg = f"Submission of jobscript at {job.jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
             self.logger.error(msg)
             raise JobSubmissionError(msg)
+
+    def resubmit_job(self, job: Job):
+        result = self._submit_job_impl(job)
+
+        if result.returncode:
+            msg = f"Resubmission of jobscript at {job.jobscript_path} failed with status {result.returncode} ({result.stderr.strip()})"
+            self.logger.error(msg)
+            state = JobState.FAILED
+            comment = msg
+        else:
+            state = JobState.QUEUED
+            comment = None
+
+        self.handler.update_job_state(job_id=job.id, state=state, comment=comment)
 
     def delete_job(self, job: Union[str, Job]):
         scheduler_id = get_scheduler_id(job)

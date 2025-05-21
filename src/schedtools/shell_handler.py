@@ -1,14 +1,20 @@
+import os
 import re
 import subprocess
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from typing import Union
+from enum import Enum
+from typing import Optional, Union
 
 import paramiko
 
-from schedtools.utils import connect_to_host
+from schedtools.schemas import JobState
+from schedtools.sql import update_job_state
+from schedtools.utils import connect_to_host, escape_literal
 
 SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
+
+UPDATE_JOB_STATE = os.path.join(".schedtools", ".venv", "bin", "update-job-state")
 
 
 class CommandHandler(ABC):
@@ -44,6 +50,21 @@ class LocalHandler(CommandHandler):
 
     def open_file(self, path: str, mode: str = "r"):
         return open(path, mode)
+
+    def update_job_state(
+        self,
+        *,
+        job_id: str,
+        state: JobState,
+        comment: Optional[str] = None,
+        on_fail: str = "raise",
+    ):
+        update_job_state(
+            state=state,
+            comment=comment,
+            job_id=job_id,
+            on_fail=on_fail,
+        )
 
 
 class ShellHandler(CommandHandler):
@@ -127,3 +148,21 @@ class ShellHandler(CommandHandler):
             sherr.pop(0)
 
         return SSHResult(cmd, "\n".join(shout), "\n".join(sherr), exit_status)
+
+    def update_job_state(
+        self,
+        *,
+        job_id: str,
+        state: Union[JobState, str],
+        comment: Optional[str] = None,
+        on_fail: str = "raise",
+    ):
+        if isinstance(state, Enum):
+            state = state.value
+        if comment:
+            comment_arg = f"--comment {escape_literal(comment)}"
+        else:
+            comment_arg = ""
+        return self.execute(
+            f"$HOME/{UPDATE_JOB_STATE} --job-id {job_id} --state {state} {comment_arg} --on-fail {on_fail}"
+        )

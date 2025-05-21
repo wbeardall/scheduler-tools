@@ -1,6 +1,6 @@
 import pytest
 
-from schedtools.storage_tracker import check_storage
+from schedtools.interfaces.storage_tracker import check_storage
 
 if __package__ is None or __package__ == "":
     from dummy_handler import DummyHandler
@@ -12,8 +12,7 @@ class DummyLogger:
     def __init__(self) -> None:
         self.error_called = False
 
-    def info(self, *args, **kwargs):
-        ...
+    def info(self, *args, **kwargs): ...
 
     def error(self, *args, **kwargs):
         self.error_called = True

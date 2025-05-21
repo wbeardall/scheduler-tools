@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Union
+from typing import Any, Union
 
 import paramiko
 from textual import work
@@ -15,13 +15,21 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
+    Log,
     Pretty,
     ProgressBar,
     Static,
 )
 from textual.worker import Worker, WorkerState
 
-from schedtools.interfaces.queue_manager.state import Job, ManagerState
+from schedtools.interfaces.queue_manager.state import (
+    Job,
+    JobLog,
+    ManagerState,
+    can_elevate_job,
+    can_resubmit_job,
+)
+from schedtools.utils import get_any_identifier
 
 
 class ConnectorScreen(Screen):
@@ -318,6 +326,7 @@ class JobBrowserScreen(Screen):
     @work(thread=True, exclusive=True)
     def fetch_jobs(self) -> None:
         _ = self.state.job_data
+        # on_worker_state_changed will now fire
 
     def on_mount(self) -> None:
         self.populate_table()
@@ -362,7 +371,7 @@ class JobBrowserScreen(Screen):
         # For now, doing it directly for simplicity in prototyping
         queued_jobs = self.state.job_data
 
-        table.add_columns(*[prettify(col) for col in columns])
+        table.add_columns("Live", *[prettify(col) for col in columns])
 
         table.loading = False
 
@@ -372,8 +381,14 @@ class JobBrowserScreen(Screen):
 
         for job in queued_jobs:
             table.add_row(
-                *[self.prettify_enum_only(getattr(job, col)) for col in columns],
-                key=job.scheduler_id,
+                # If the job is a Job object, it is live (i.e. queued with the scheduler as opposed to
+                # simply being registered as a job spec)
+                "🟢" if isinstance(job, Job) else "🔴",
+                *[
+                    self.prettify_enum_only(get_attr_or(job, col, "-"))
+                    for col in columns
+                ],
+                key=get_any_identifier(job),
             )
 
     @staticmethod
@@ -411,6 +426,10 @@ class JobScriptScreen(Screen):
         self.browser_handle = browser_handle
 
 
+def get_attr_or(obj: Any, attr: str, default: Any) -> Any:
+    return getattr(obj, attr, default) or default
+
+
 class JobDetailScreen(JobScriptScreen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
@@ -431,15 +450,19 @@ class JobDetailScreen(JobScriptScreen):
 
                 with Horizontal(classes="info-row"):
                     yield Label("Queue:", classes="label")
-                    yield Label(self.job.queue, classes="value")
+                    yield Label(get_attr_or(self.job, "queue", "-"), classes="value")
 
                 with Horizontal(classes="info-row"):
                     yield Label("Walltime:", classes="label")
-                    yield Label(str(self.job.walltime or "-"), classes="value")
+                    yield Label(
+                        str(get_attr_or(self.job, "walltime", "-")), classes="value"
+                    )
 
                 with Horizontal(classes="info-row"):
                     yield Label("Start Time:", classes="label")
-                    yield Label(str(self.job.start_time or "-"), classes="value")
+                    yield Label(
+                        str(get_attr_or(self.job, "start_time", "-")), classes="value"
+                    )
 
                 with Horizontal(classes="progress-section"):
                     yield Label("Completion:", classes="label")
@@ -452,14 +475,24 @@ class JobDetailScreen(JobScriptScreen):
 
                 with Horizontal(classes="info-row"):
                     yield Label("Owner:", classes="label")
-                    yield Label(self.job.owner, classes="value")
+                    yield Label(get_attr_or(self.job, "owner", "-"), classes="value")
 
                 with Horizontal(classes="info-row"):
-                    yield Label("Path:", classes="label")
+                    yield Label("Script path:", classes="label")
                     yield Label(self.job.jobscript_path, classes="value")
 
+                with Horizontal(classes="info-row"):
+                    yield Label("Experiment path:", classes="label")
+                    yield Label(self.job.experiment_path, classes="value")
+
+                with Horizontal(classes="info-row"):
+                    yield Label("Comment:", classes="label")
+                    yield Label(get_attr_or(self.job, "comment", "-"), classes="value")
+
                 yield Label("Details:", classes="label")
-                yield Pretty(self.job.job_details, id="pretty-container")
+                yield Pretty(
+                    get_attr_or(self.job, "job_details", {}), id="pretty-container"
+                )
 
             with Horizontal(id="action-buttons", classes="button-container"):
                 yield Button(
@@ -468,13 +501,27 @@ class JobDetailScreen(JobScriptScreen):
                     id="job-detail-back-button",
                     classes="left-button",
                 )
+                yield Button(
+                    "🔍 Logs",
+                    variant="primary",
+                    id="job-detail-log-button",
+                    classes="action-button",
+                )
+                if can_elevate_job(self.job):
+                    yield Button(
+                        "⚡️ Elevate Job",
+                        variant="warning",
+                        id="job-detail-elevate-button",
+                        classes="action-button",
+                    )
+                if can_resubmit_job(self.job):
+                    yield Button(
+                        "🔄 Resubmit Job",
+                        variant="primary",
+                        id="job-detail-resubmit-button",
+                        classes="action-button",
+                    )
                 yield Static()
-                # yield Button(
-                #     "⚡️ Elevate Job",
-                #     variant="warning",
-                #     id="job-detail-elevate-button",
-                #     classes="right-button",
-                # )
                 yield Button(
                     "🗑️ Delete Job",
                     variant="error",
@@ -484,26 +531,110 @@ class JobDetailScreen(JobScriptScreen):
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "job-detail-delete-button":
-            try:
-                self.state.workload_manager.delete_job(self.job)
-            except Exception as e:
-                self.notify(f"❌ Error deleting job: {e}")
-            self.state.evict_current_queue()
-            self.browser_handle.populate_table()
-            self.app.pop_screen()
-        elif event.button.id == "job-detail-back-button":
-            self.app.pop_screen()
-        elif event.button.id == "job-detail-elevate-button":
-            self.app.push_screen(
-                ExpressQueuePromptScreen(state=self.state, job_id=self.job.id)
-            )
+        match event.button.id:
+            case "job-detail-delete-button":
+                try:
+                    self.state.workload_manager.delete_job(self.job)
+                    self.state.evict_current_queue()
+                    self.browser_handle.populate_table()
+                    self.app.pop_screen()
+                except Exception as e:
+                    self.notify(f"❌ Error deleting job: {e}")
+            case "job-detail-elevate-button":
+                self.notify("Job elevation is not implemented.")
+                # self.app.push_screen(
+                #     ExpressQueuePromptScreen(
+                #         state=self.state,
+                #         browser_handle=self.browser_handle,
+                #         job_id=self.job.id,
+                #     )
+                # )
+            case "job-detail-resubmit-button":
+                try:
+                    self.state.workload_manager.submit_job(self.job)
+                    self.state.evict_current_queue()
+                    self.browser_handle.populate_table()
+                    self.app.pop_screen()
+                except Exception as e:
+                    self.notify(f"❌ Error resubmitting job: {e}")
+            case "job-detail-back-button":
+                self.app.pop_screen()
+            case "job-detail-log-button":
+                self.app.push_screen(
+                    JobLogScreen(
+                        state=self.state,
+                        browser_handle=self.browser_handle,
+                        job_id=self.job.id,
+                    )
+                )
 
     def on_mount(self) -> None:
         """Add some styling when the screen mounts."""
         self.query_one("#completion-bar", ProgressBar).update(
-            progress=self.job.percent_completion, total=100
+            progress=get_attr_or(self.job, "percent_completion", 0), total=100
         )
+
+
+class JobLogScreen(JobScriptScreen):
+    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    job_log: JobLog
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+
+        with Container(id="job-log-screen", classes="screen-container"):
+            yield Label(
+                f"📋 Job Log: {self.job.name}",
+                id="job-title",
+                classes="screen-title",
+            )
+
+            yield Log(id="job-log", classes="log-panel")
+
+            with Horizontal(id="action-buttons", classes="button-container"):
+                yield Button(
+                    "⬅️ Back",
+                    variant="primary",
+                    id="job-log-back-button",
+                    classes="left-button",
+                )
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "job-log-back-button":
+            self.app.pop_screen()
+
+    def on_mount(self) -> None:
+        self.populate_log()
+
+    def populate_log(self) -> None:
+        log = self.query_one("#job-log", Log)
+        log.loading = True
+        self.fetch_job_log()
+
+    @work(thread=True, exclusive=True)
+    def fetch_job_log(self) -> None:
+        self.job_log = self.state.get_job_log(self.job.id)
+        # on_worker_state_changed will now fire
+
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.SUCCESS:
+            if self.job_log.notify is not None:
+                self.notify(self.job_log.notify)
+            if self.job_log.close:
+                self.app.pop_screen()
+            else:
+                self.display_log()
+        elif event.state == WorkerState.ERROR:
+            log = self.query_one("#job-log", Log)
+            log.loading = False
+            self.notify(f"Error fetching jobs: {event.error}")
+
+    def display_log(self) -> None:
+        log = self.query_one("#job-log", Log)
+        log.write_lines(self.job_log.log.split("\n"))
+        log.loading = False
+        log.refresh()
 
 
 class ExpressQueuePromptScreen(JobScriptScreen):
@@ -561,6 +692,7 @@ class ExpressQueuePromptScreen(JobScriptScreen):
             self.notify(f"Elevating job with express account '{express_account}'...")
             self.state.workload_manager.elevate_job(self.job, express_account)
             self.state.job_data.pop(self.job.id)
+            self.browser_handle.populate_table()
             # Pop twice to return to the job browser screen
             self.notify(f"✅ Elevated job '{self.job.name}'")
             self.app.pop_screen()

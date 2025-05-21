@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from schedtools.clear_logs import clear_cluster_logs
+from schedtools.interfaces.clear_logs import clear_cluster_logs
 
 
 @pytest.mark.parametrize("pattern", ["pbs", "slurm"])

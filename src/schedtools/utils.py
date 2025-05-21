@@ -229,13 +229,26 @@ def get_scheduler_id(job: Union[str, JobWithId]):
     return getattr(job, "scheduler_id", job)
 
 
+def get_any_identifier(job: Union[str, JobWithId, JobWithSchedulerId]):
+    if isinstance(job, str):
+        return job
+    if hasattr(job, "id"):
+        return job.id
+    if hasattr(job, "scheduler_id"):
+        return job.scheduler_id
+    raise ValueError(f"Job {job} has no id or scheduler_id")
+
+
 def parse_timeperiod(walltime: str) -> int:
     hours, minutes, seconds = map(int, walltime.split(":"))
     return timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
 
 def parse_datetime(datetime_str: str) -> datetime:
-    return datetime.strptime(datetime_str, "%a %b %d %H:%M:%S %Y")
+    try:
+        return datetime.fromisoformat(datetime_str)
+    except ValueError:
+        return datetime.strptime(datetime_str, "%a %b %d %H:%M:%S %Y")
 
 
 def parse_memory(memory: str) -> int:
@@ -251,3 +264,7 @@ def parse_memory(memory: str) -> int:
             multiplier = scale_map[scale.lower()]
         return int(numeric_part) * multiplier
     raise ValueError(f"Unrecognized memory format: {memory}")
+
+
+def escape_literal(literal: str) -> str:
+    return literal.replace("'", "\\'").replace('"', '\\"')

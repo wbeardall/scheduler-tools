@@ -6,8 +6,9 @@ from urllib.parse import urlparse
 
 import paramiko
 
+from schedtools.clusters import Cluster
 from schedtools.managers import WorkloadManager, get_workload_manager
-from schedtools.schemas import Job, Queue
+from schedtools.schemas import Job, JobState, Queue
 from schedtools.shell_handler import ShellHandler
 from schedtools.utils import connect_from_attrs, connect_to_host
 
@@ -59,6 +60,14 @@ class KVStore(dict):
         return self[key]
 
 
+@dataclass
+class JobLog:
+    filename: Union[str, None] = None
+    log: Union[str, None] = None
+    notify: Union[str, None] = None
+    close: bool = False
+
+
 class ManagerState:
     ssh: paramiko.SSHConfig
     selected_hostname: str | None = None
@@ -66,6 +75,7 @@ class ManagerState:
     kv_store: KVStore
     added_hosts: Dict[str, Host]
     queues: Dict[str, Queue]
+    cluster_map: Dict[str, Cluster]
 
     def __init__(self):
         self.ssh = paramiko.SSHConfig()
@@ -75,6 +85,7 @@ class ManagerState:
         self.kv_store = KVStore()
         self.added_hosts = {}
         self.queues = {}
+        self.cluster_map = {}
 
     @cached_property
     def _config_hosts(self) -> Dict[str, Host]:
@@ -143,9 +154,13 @@ class ManagerState:
     @property
     def job_data(self) -> Queue:
         if self.selected_hostname not in self.queues:
+            cached_queue = self.workload_manager.get_cluster_jobs_from_db()
             queue = self.workload_manager.get_jobs()
+
             if self.selected_host.user is not None:
                 queue = queue.filter_owner(self.selected_host.user)
+
+            queue = cached_queue.merge(queue)
             self.queues[self.selected_hostname] = queue
         return self.queues[self.selected_hostname]
 
@@ -163,3 +178,44 @@ class ManagerState:
 
     def get_job(self, job_id: str) -> Job:
         return self.job_data.get(job_id)
+
+    @lru_cache(maxsize=None)
+    def get_job_log(self, job_id: str) -> JobLog:
+        job = self.get_job(job_id)
+        experiment_logfile = os.path.join(
+            job.experiment_path,
+            "logfile.log",
+        )
+        try:
+            with self.shell_handler.open_file(experiment_logfile) as f:
+                return JobLog(filename=experiment_logfile, log=f.read().decode("utf-8"))
+        except IOError:
+            output_path = getattr(job, "output_path", None)
+            if output_path is None:
+                return JobLog(
+                    filename=None,
+                    log=None,
+                    notify=f"Could not identify any log paths for job {job.name}",
+                    close=True,
+                )
+            try:
+                with self.shell_handler.open_file(output_path) as f:
+                    return JobLog(
+                        filename=output_path,
+                        log=f.read().decode("utf-8"),
+                        notify="Could not find experiment log, falling back to job log file",
+                    )
+            except IOError:
+                return JobLog(
+                    log=None,
+                    notify=f"No logs found for job {job.name}",
+                    close=True,
+                )
+
+
+def can_elevate_job(job: Job) -> bool:
+    return job.state == JobState.QUEUED
+
+
+def can_resubmit_job(job: Job) -> bool:
+    return job.state == JobState.FAILED

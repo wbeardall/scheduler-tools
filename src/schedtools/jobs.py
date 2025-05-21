@@ -1,7 +1,5 @@
 import json
 import os
-import tempfile
-from contextlib import contextmanager
 from logging import Logger
 from typing import Any, Dict, List, Union
 
@@ -16,8 +14,8 @@ from schedtools.exceptions import (
 from schedtools.log import loggers
 from schedtools.managers import WorkloadManager, get_workload_manager
 from schedtools.schemas import Job, Queue
-from schedtools.shell_handler import CommandHandler, LocalHandler, ShellHandler
-from schedtools.tracking import JobTrackingQueue, default_db_path
+from schedtools.shell_handler import CommandHandler, ShellHandler
+from schedtools.tracking import job_tracking_queue
 from schedtools.utils import systemd_service
 
 RERUN_TRACKED_FILE = "$HOME/.rerun-tracked.json"
@@ -26,28 +24,6 @@ if systemd_service():
 else:
     CACHE_DIR = os.path.join(os.path.expanduser("~"), ".rerun")
 RERUN_TRACKED_CACHE = os.path.join(CACHE_DIR, "rerun-tracked-cache.json")
-
-
-@contextmanager
-def job_tracking_queue(handler: Union[CommandHandler, str, SSHClient]):
-    if not isinstance(handler, CommandHandler):
-        handler = ShellHandler(handler)
-
-    if isinstance(handler, LocalHandler):
-        yield JobTrackingQueue(db=default_db_path)
-
-    else:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Pull the tracked database from the cluster
-            temp_path = os.path.join(temp_dir, "db")
-            with handler.open_file(default_db_path, "rb") as f:
-                with open(temp_path, "wb") as wf:
-                    wf.write(f.read())
-
-            yield JobTrackingQueue(db=temp_path)
-
-            with handler.open_file(default_db_path, "wb") as f:
-                f.write(open(temp_path, "rb").read())
 
 
 def track_new_jobs(

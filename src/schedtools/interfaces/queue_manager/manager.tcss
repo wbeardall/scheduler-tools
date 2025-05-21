@@ -58,7 +58,7 @@ ProgressBar {
 }
 
 .label {
-    width: 15;
+    width: 25;
     color: $text-muted;
     text-style: bold;
 }

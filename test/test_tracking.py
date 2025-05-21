@@ -5,12 +5,8 @@ import tempfile
 import pytest
 
 from schedtools.schemas import JobSpec, JobState
-from schedtools.tracking import (
-    JobTrackingQueue,
-    ensure_table,
-    update_job_state,
-    upsert_jobs,
-)
+from schedtools.sql import ensure_table, update_job_state, upsert_jobs
+from schedtools.tracking import JobTrackingQueue
 
 
 @pytest.fixture
@@ -32,7 +28,9 @@ def db_conn(db_path):
 def test_job_tracking_insert(db_conn, on_conflict):
     jobs = [
         JobSpec.from_unsubmitted(
-            jobscript_path=f"test-{i}", experiment_path=f"/tmp/test-output-{i}"
+            jobscript_path=f"test-{i}",
+            experiment_path=f"/tmp/test-output-{i}",
+            cluster="cx3",
         )
         for i in range(3)
     ]
@@ -44,7 +42,9 @@ def test_job_tracking_insert(db_conn, on_conflict):
 def test_job_tracking_upsert(db_conn, on_conflict):
     jobs = [
         JobSpec.from_unsubmitted(
-            jobscript_path=f"test-{i}", experiment_path=f"/tmp/test-output-{i}"
+            jobscript_path=f"test-{i}",
+            experiment_path=f"/tmp/test-output-{i}",
+            cluster="cx3",
         )
         for i in range(2)
     ]
@@ -77,7 +77,9 @@ def test_job_tracking_upsert(db_conn, on_conflict):
 
 def test_job_tracking_update(db_conn):
     job = JobSpec.from_unsubmitted(
-        jobscript_path="test", experiment_path="/tmp/test-output"
+        jobscript_path="test",
+        experiment_path="/tmp/test-output",
+        cluster="cx3",
     )
     upsert_jobs(db_conn, [job])
     update_job_state(conn=db_conn, job_id=job.id, state=JobState.COMPLETED)
@@ -90,17 +92,19 @@ def test_job_tracking_update(db_conn):
 def test_job_tracking_queue(db_path):
     queue = JobTrackingQueue(db=db_path)
     job = JobSpec.from_unsubmitted(
-        jobscript_path="test", experiment_path="/tmp/test-output"
+        jobscript_path="test",
+        experiment_path="/tmp/test-output",
+        cluster="cx3",
     )
     queue.register(job)
-    assert job.id in queue
+    assert job in queue
 
     new_queue = JobTrackingQueue(db=db_path)
-    assert job.id in new_queue
+    assert job in new_queue
     assert new_queue.get(job.id) == job
 
     queue.pop(job.id)
-    assert job.id not in queue
+    assert job not in queue
 
     new_queue = JobTrackingQueue(db=db_path)
-    assert job.id not in new_queue
+    assert job not in new_queue

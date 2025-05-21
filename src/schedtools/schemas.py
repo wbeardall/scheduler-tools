@@ -1,9 +1,12 @@
+import copy
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Iterator, List, Union
+from typing import Any, Iterator, List, Mapping, Union
 
+from schedtools.clusters import Cluster
 from schedtools.consts import experiment_path_key, job_id_key
 from schedtools.utils import (
     parse_datetime,
@@ -141,26 +144,44 @@ class ResourceUsage:
 @dataclass
 class JobSpec:
     id: str
+    name: str
     experiment_path: str
+    cluster: Cluster
     state: JobState
+    # Time when the job was last modified
+    modified_time: datetime
+    comment: Union[str, None]
     queue: Union[str, None]
     project: Union[str, None]
     jobscript_path: Union[str, None]
 
     @property
-    def walltime(self) -> timedelta:
-        return self.resource_request.walltime
+    def is_running(self) -> bool:
+        return self.state == JobState.RUNNING
+
+    @property
+    def is_queued(self) -> bool:
+        return self.state == JobState.QUEUED
 
     @classmethod
-    def from_sqlite(cls, data: dict) -> "JobSpec":
+    def from_sqlite(cls, data: Mapping[str, Any]) -> "JobSpec":
+        if not isinstance(data, dict):
+            data = dict(data)
         return cls(
             id=data["id"],
+            name=os.path.basename(data["experiment_path"]),
             experiment_path=data["experiment_path"],
+            cluster=Cluster(data.get("cluster", "unknown")),
             state=JobState(data["state"]),
             queue=data["queue"],
             project=data["project"],
             jobscript_path=data["jobscript_path"],
+            modified_time=parse_datetime(data["modified_time"]),
+            comment=data.get("comment", None),
         )
+
+    def __eq__(self, other: "JobSpec") -> bool:
+        return self.id == other.id
 
     @classmethod
     def from_unsubmitted(
@@ -170,14 +191,23 @@ class JobSpec:
         experiment_path: str,
         queue: Union[str, None] = None,
         project: Union[str, None] = None,
+        cluster: Union[Cluster, str, None] = None,
     ) -> "JobSpec":
+        if cluster is None:
+            cluster = Cluster.from_local()
+        elif isinstance(cluster, str):
+            cluster = Cluster(cluster)
         return cls(
             id=str(uuid.uuid4()),
             experiment_path=experiment_path,
+            name=os.path.basename(experiment_path),
             state=JobState.UNSUBMITTED,
+            cluster=cluster,
             jobscript_path=jobscript_path,
             queue=queue,
             project=project,
+            modified_time=datetime.now(),
+            comment=None,
         )
 
     def to_sqlite(self) -> dict:
@@ -188,6 +218,9 @@ class JobSpec:
             "queue": self.queue,
             "project": self.project,
             "jobscript_path": self.jobscript_path,
+            "cluster": self.cluster.value,
+            "modified_time": self.modified_time.isoformat(),
+            "comment": self.comment,
         }
 
 
@@ -197,9 +230,6 @@ class Job(JobSpec):
 
     # Scheduler-defined job ID
     scheduler_id: str
-
-    # Job name
-    name: str
 
     # Job owner
     owner: str
@@ -234,78 +264,14 @@ class Job(JobSpec):
     # Path to the output file
     output_path: str
 
-    # Time when the job was last modified
-    modified_time: datetime
-
     # Priority of the job
     priority: int
-
-    # Scheduler-defined comment
-    comment: str
 
     # Number of times the job has been restarted
     run_count: int
 
     # Unmodified job details
     job_details: dict
-
-    @classmethod
-    def parse(cls, scheduler_id: str, job: dict) -> "Job":
-        if "resources_used" in job:
-            resource_usage = ResourceUsage.parse(job["resources_used"])
-        else:
-            resource_usage = None
-        if "stime" in job:
-            start_time = parse_datetime(job["stime"])
-        else:
-            start_time = None
-        if "Submit_arguments" in job:
-            submit_arguments = job["Submit_arguments"].replace("\n", "").split()
-            jobscript_path = submit_arguments[-1]
-        else:
-            submit_arguments = None
-            jobscript_path = None
-        # Attempt to get the job ID from the job's environment variables
-        variables: dict = job.get("Variable_List", {})
-        id = variables.get(job_id_key, None)
-        experiment_path = variables.get(experiment_path_key, None)
-
-        return cls(
-            id=id,
-            experiment_path=experiment_path,
-            scheduler_id=scheduler_id,
-            name=job["Job_Name"],
-            owner=job["Job_Owner"],
-            state=JobState.parse(job.get("job_state", "unknown")),
-            resource_usage=resource_usage,
-            resource_request=ResourceRequest.parse(job["Resource_List"]),
-            queue=job["queue"],
-            server=job["server"],
-            project=job["project"],
-            start_time=start_time,
-            jobscript_path=jobscript_path,
-            creation_time=parse_datetime(job["ctime"]),
-            queue_time=parse_datetime(job["qtime"]),
-            checkpoint=job["Checkpoint"],
-            submit_arguments=submit_arguments,
-            # Error_Path is of form `<hostname>:<error_path>`
-            error_path=job["Error_Path"].split(":")[-1],
-            # Output_Path is of form `<hostname>:<output_path>`
-            output_path=job["Output_Path"].split(":")[-1],
-            modified_time=parse_datetime(job["mtime"]),
-            priority=job.get("Priority", 0),
-            comment=job.get("comment", ""),
-            run_count=job.get("run_count", 0),
-            job_details=job,
-        )
-
-    @property
-    def is_running(self) -> bool:
-        return self.state == JobState.RUNNING
-
-    @property
-    def is_queued(self) -> bool:
-        return self.state == JobState.QUEUED
 
     @property
     def end_time(self) -> Union[datetime, None]:
@@ -329,6 +295,76 @@ class Job(JobSpec):
             )
         return 0
 
+    @property
+    def walltime(self) -> timedelta:
+        return self.resource_request.walltime
+
+    def __eq__(self, other: Union["Job", "JobSpec"]) -> bool:
+        # If other is a JobSpec, compare the IDs
+        if isinstance(other, JobSpec):
+            return self.id == other.id
+        # If other is a Job, and we have an ID, compare the IDs
+        elif self.id is not None and self.id == getattr(other, "id", None):
+            return True
+        # If other is a Job, and we have a scheduler ID, compare the scheduler IDs
+        elif self.scheduler_id is not None and self.scheduler_id == getattr(
+            other, "scheduler_id", None
+        ):
+            return True
+        return False
+
+    @classmethod
+    def parse(cls, scheduler_id: str, job: dict) -> "Job":
+        if "resources_used" in job:
+            resource_usage = ResourceUsage.parse(job["resources_used"])
+        else:
+            resource_usage = None
+        if "stime" in job:
+            start_time = parse_datetime(job["stime"])
+        else:
+            start_time = None
+        if "Submit_arguments" in job:
+            submit_arguments = job["Submit_arguments"].replace("\n", "").split()
+            jobscript_path = submit_arguments[-1]
+        else:
+            submit_arguments = None
+            jobscript_path = None
+        # Attempt to get the job ID from the job's environment variables
+        variables: dict = job.get("Variable_List", {})
+        id = variables.get(job_id_key, None)
+        experiment_path = variables.get(experiment_path_key, None)
+        cluster = Cluster.from_server(job["server"])
+
+        return cls(
+            id=id,
+            experiment_path=experiment_path,
+            cluster=cluster,
+            scheduler_id=scheduler_id,
+            name=job["Job_Name"],
+            owner=job["Job_Owner"],
+            state=JobState.parse(job.get("job_state", "unknown")),
+            resource_usage=resource_usage,
+            resource_request=ResourceRequest.parse(job["Resource_List"]),
+            queue=job["queue"],
+            server=job["server"],
+            project=job["project"],
+            start_time=start_time,
+            jobscript_path=jobscript_path,
+            creation_time=parse_datetime(job["ctime"]),
+            queue_time=parse_datetime(job["qtime"]),
+            checkpoint=job["Checkpoint"],
+            submit_arguments=submit_arguments,
+            # Error_Path is of form `<hostname>:<error_path>`
+            error_path=job["Error_Path"].split(":")[-1],
+            # Output_Path is of form `<hostname>:<output_path>`
+            output_path=job["Output_Path"].split(":")[-1],
+            modified_time=parse_datetime(job["mtime"]),
+            priority=job.get("Priority", 0),
+            comment=job.get("comment", None),
+            run_count=job.get("run_count", 0),
+            job_details=job,
+        )
+
 
 class Queue:
     jobs: List[Job]
@@ -345,15 +381,27 @@ class Queue:
 
     def __getitem__(self, id: str) -> Job:
         for job in self.jobs:
-            if job.id == id or job.scheduler_id == id:
+            if job.id == id or getattr(job, "scheduler_id", None) == id:
                 return job
         raise KeyError(f"Job with ID '{id}' not found in queue")
 
+    def add(self, job: Job) -> None:
+        for i, j in enumerate(self.jobs):
+            if j == job:
+                self.jobs[i] = job
+                break
+        else:
+            self.jobs.append(job)
+
+    def merge(self, other: "Queue") -> "Queue":
+        new = copy.deepcopy(self)
+        for job in other.jobs:
+            new.add(job)
+        return new
+
     def __contains__(self, job: Union[str, Job]) -> bool:
-        if isinstance(job, Job):
-            job = job.id
         for j in self.jobs:
-            if j.id == job or j.scheduler_id == job:
+            if j == job:
                 return True
         return False
 
@@ -387,3 +435,8 @@ class Queue:
         if isinstance(ids, str):
             ids = [ids]
         return Queue([j for j in self if j.id in ids])
+
+    def filter_cluster(self, cluster: Union[Cluster, str]) -> "Queue":
+        if isinstance(cluster, Cluster):
+            cluster = cluster.value
+        return Queue([j for j in self if j.cluster.value == cluster])
