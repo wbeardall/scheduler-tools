@@ -111,7 +111,7 @@ class JobTrackingQueue(Queue):
 
     @classmethod
     def from_local(cls) -> "JobTrackingQueue":
-        return cls(db=get_job_tracking_db_path)
+        return cls(db=get_job_tracking_db_path())
 
 
 @contextmanager

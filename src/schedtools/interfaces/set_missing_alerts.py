@@ -1,7 +1,11 @@
+from logging import getLogger
+
 from schedtools.managers import get_workload_manager
 from schedtools.schemas import JobState
 from schedtools.shell_handler import LocalHandler
 from schedtools.tracking import JobTrackingQueue
+
+logger = getLogger(__name__)
 
 
 def set_missing_alerts():
@@ -14,6 +18,9 @@ def set_missing_alerts():
         # Ensure the job is up to date
         job = queue.pull_updated(job)
         if job not in scheduler_queue:
+            logger.info(
+                f"Setting alert for job {job.id} because it is not in the scheduler queue."
+            )
             local_handler.update_job_state(
                 job_id=job.id,
                 state=JobState.ALERT,
