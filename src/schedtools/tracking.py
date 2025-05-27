@@ -88,6 +88,16 @@ class JobTrackingQueue(Queue):
         for row in cursor:
             self.jobs.append(JobSpec.from_sqlite(row))
 
+    def pull_updated(self, job: JobSpec) -> JobSpec:
+        cursor = self.conn.execute("SELECT * FROM jobs WHERE id = ?", (job.id,))
+        row = cursor.fetchone()
+        if row is None:
+            raise KeyError(f"Job {job.id} not found")
+
+        job = JobSpec.from_sqlite(row)
+        self.register(job, on_conflict="update")
+        return job
+
     def pop(self, job_id: str) -> JobSpec:
         job = super().pop(job_id)
         self.conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))

@@ -10,7 +10,6 @@ from typing import Optional, Union
 import paramiko
 
 from schedtools.clusters import Cluster
-from schedtools.interfaces import set_missing_alerts
 from schedtools.schemas import JobState
 from schedtools.sql import update_job_state
 from schedtools.utils import connect_to_host, escape_literal
@@ -72,6 +71,9 @@ class LocalHandler(CommandHandler):
         )
 
     def set_missing_alerts(self):
+        # Local import to avoid circular import
+        from schedtools.interfaces.set_missing_alerts import set_missing_alerts
+
         set_missing_alerts()
 
 
