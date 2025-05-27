@@ -30,6 +30,7 @@ from schedtools.interfaces.queue_manager.state import (
     can_resubmit_job,
     get_live_icon,
 )
+from schedtools.schemas import JobState
 from schedtools.utils import get_any_identifier
 
 
@@ -315,6 +316,12 @@ class JobBrowserScreen(Screen):
                     id="job-browser-back-button",
                     classes="left-button",
                 )
+                yield Button(
+                    "⚠️ Resubmit Alerted Jobs",
+                    variant="warning",
+                    id="job-browser-resubmit-alerted-button",
+                    classes="action-button",
+                )
                 yield Static()
                 yield Button(
                     "🔄 Refresh",
@@ -325,10 +332,14 @@ class JobBrowserScreen(Screen):
 
         yield Footer()
 
-    @work(thread=True, exclusive=True)
+    @work(thread=True, exclusive=True, name="fetch-jobs")
     def fetch_jobs(self) -> None:
         _ = self.state.job_data
         # on_worker_state_changed will now fire
+
+    @work(thread=True, exclusive=True, name="resubmit-alerted-jobs")
+    def resubmit_alerted_jobs(self) -> None:
+        self.state.resubmit_alerted_jobs()
 
     def on_mount(self) -> None:
         self.populate_table()
@@ -340,6 +351,12 @@ class JobBrowserScreen(Screen):
         self.fetch_jobs()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        if event.worker.name == "fetch-jobs":
+            self.fetch_jobs_hook(event)
+        elif event.worker.name == "resubmit-alerted-jobs":
+            self.resubmit_alerted_jobs_hook(event)
+
+    def fetch_jobs_hook(self, event: Worker.StateChanged) -> None:
         if event.state == WorkerState.SUCCESS:
             self.display_table()
         elif event.state == WorkerState.ERROR:
@@ -348,9 +365,24 @@ class JobBrowserScreen(Screen):
             table.refresh()
             self.notify(f"Error fetching jobs: {event.error}")
 
+    def resubmit_alerted_jobs_hook(self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.SUCCESS:
+            self.notify("Alerted jobs resubmitted.")
+            self.state.evict_current_queue()
+            self.populate_table()
+        elif event.state == WorkerState.ERROR:
+            self.notify(f"Error resubmitting alerted jobs: {event.error}")
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "job-browser-back-button":
             self.app.pop_screen()
+        elif event.button.id == "job-browser-resubmit-alerted-button":
+            alerted_count = self.state.count_by_state(JobState.ALERT)
+            if alerted_count > 0:
+                self.notify(f"Resubmitting {alerted_count} alerted jobs...")
+                self.state.resubmit_alerted_jobs()
+            else:
+                self.notify("No alerted jobs found.")
         elif event.button.id == "job-browser-refresh-button":
             self.state.evict_current_queue()
             self.populate_table()

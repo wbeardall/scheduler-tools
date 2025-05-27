@@ -26,6 +26,10 @@ class CommandHandler(ABC):
     def execute(self, cmd: str, unformat: bool = False) -> SSHResult:
         pass
 
+    @cached_property
+    def cluster(self) -> Cluster:
+        return Cluster.from_handler(self)
+
 
 class LocalHandler(CommandHandler):
     """Thin wrapper of `subprocess.run` to allow for local use of `schedtools.managers.WorkloadManager` objects."""
@@ -179,7 +183,3 @@ class ShellHandler(CommandHandler):
 
     def set_missing_alerts(self):
         return self.execute(f"$HOME/{SET_MISSING_ALERTS}")
-
-    @cached_property
-    def cluster(self) -> Cluster:
-        return Cluster.from_handler(self)

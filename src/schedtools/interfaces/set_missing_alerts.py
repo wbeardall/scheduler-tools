@@ -9,7 +9,7 @@ def set_missing_alerts():
     local_handler = LocalHandler()
     workload_manager = get_workload_manager(local_handler)
     scheduler_queue = workload_manager.get_jobs()
-    queue.pull()
+
     for job in queue.filter_state(JobState.QUEUED):
         # Ensure the job is up to date
         job = queue.pull_updated(job)

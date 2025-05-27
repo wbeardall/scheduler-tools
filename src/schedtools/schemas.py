@@ -52,6 +52,34 @@ class JobState(Enum):
                 return cls.UNKNOWN
 
 
+def _match_str_job(a: str, b: Union["JobSpec", "Job"]) -> bool:
+    any_match = []
+    if hasattr(b, "id"):
+        any_match.append(a == b.id)
+    if hasattr(b, "scheduler_id"):
+        any_match.append(a == b.scheduler_id)
+    return any(any_match)
+
+
+def match_jobs(
+    a: Union["JobSpec", "Job", str], b: Union["JobSpec", "Job", str]
+) -> bool:
+    if isinstance(a, str) and isinstance(b, str):
+        return a == b
+    elif isinstance(a, str):
+        return _match_str_job(a, b)
+    elif isinstance(b, str):
+        return _match_str_job(b, a)
+    any_match = []
+    if hasattr(a, "id") and hasattr(b, "id"):
+        any_match.append(a.id == b.id)
+    if hasattr(a, "scheduler_id") and hasattr(b, "scheduler_id"):
+        any_match.append(a.scheduler_id == b.scheduler_id)
+    if any(any_match):
+        return True
+    return False
+
+
 @dataclass
 class ResourceRequest:
     # Memory requested
@@ -187,8 +215,8 @@ class JobSpec:
             comment=data.get("comment", None),
         )
 
-    def __eq__(self, other: "JobSpec") -> bool:
-        return self.id == other.id
+    def __eq__(self, other: Any) -> bool:
+        return match_jobs(self, other)
 
     @classmethod
     def from_unsubmitted(
@@ -310,20 +338,6 @@ class Job(JobSpec):
     def walltime(self) -> timedelta:
         return self.resource_request.walltime
 
-    def __eq__(self, other: Union["Job", "JobSpec"]) -> bool:
-        # If other is a JobSpec, compare the IDs
-        if isinstance(other, JobSpec):
-            return self.id == other.id
-        # If other is a Job, and we have an ID, compare the IDs
-        elif self.id is not None and self.id == getattr(other, "id", None):
-            return True
-        # If other is a Job, and we have a scheduler ID, compare the scheduler IDs
-        elif self.scheduler_id is not None and self.scheduler_id == getattr(
-            other, "scheduler_id", None
-        ):
-            return True
-        return False
-
     @classmethod
     def parse(cls, scheduler_id: str, job: dict) -> "Job":
         if "resources_used" in job:
@@ -392,13 +406,13 @@ class Queue:
 
     def __getitem__(self, id: str) -> Job:
         for job in self.jobs:
-            if job.id == id or getattr(job, "scheduler_id", None) == id:
+            if match_jobs(job, id):
                 return job
         raise KeyError(f"Job with ID '{id}' not found in queue")
 
     def add(self, job: Job) -> None:
         for i, j in enumerate(self.jobs):
-            if j == job:
+            if match_jobs(j, job):
                 self.jobs[i] = job
                 break
         else:
@@ -412,7 +426,7 @@ class Queue:
 
     def __contains__(self, job: Union[str, Job]) -> bool:
         for j in self.jobs:
-            if j == job:
+            if match_jobs(j, job):
                 return True
         return False
 
@@ -424,7 +438,7 @@ class Queue:
 
     def pop(self, job: str) -> Job:
         for i, j in enumerate(self.jobs):
-            if j.id == job or j.scheduler_id == job:
+            if match_jobs(j, job):
                 return self.jobs.pop(i)
         raise KeyError(f"Job with ID '{job}' not found in queue")
 

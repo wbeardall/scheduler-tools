@@ -1,13 +1,8 @@
-import logging
 import os
 import tempfile
 
 import pytest
 
-from schedtools.jobs import (
-    RERUN_TRACKED_CACHE,
-    rerun_jobs,
-)
 from schedtools.managers import PBS
 from schedtools.schemas import Job
 from schedtools.sql import set_job_tracking_db_path
@@ -41,44 +36,44 @@ def test_get_jobs():
         assert job.percent_completion == 0
 
 
-@pytest.mark.skip
-@pytest.mark.parametrize(
-    "valid",
-    [
-        # pytest.param(False,marks=pytest.mark.xfail(reason="Unrecognised batch system")),
-        True
-    ],
-)
-@pytest.mark.parametrize("jobs", [False, True])
-@pytest.mark.parametrize("tracked", [False, True])
-@pytest.mark.parametrize("rerun", [False, True])
-@pytest.mark.parametrize("memkill", [False, True])
-@pytest.mark.parametrize("wallkill", [False, True])
-@pytest.mark.parametrize("qsub", [False, True])
-def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill, qsub):
-    os.environ["SCHEDTOOLS_PROG"] = "rerun"
-    to_destroy.append(os.path.dirname(RERUN_TRACKED_CACHE))
-    handler = DummyHandler(
-        valid=valid,
-        jobs=jobs,
-        tracked=tracked,
-        rerun=rerun,
-        memkill=memkill,
-        wallkill=wallkill,
-        qsub=qsub,
-    )
-    rerun_jobs(
-        handler=handler,
-        logger=logging.getLogger(__name__).addHandler(logging.NullHandler()),
-    )
-    cached = []  # get_tracked_cache()
-    if tracked:
-        if memkill and (not qsub) and (not rerun):
-            # if qsub, id should not be in cached
-            assert "70134" in cached
-        if wallkill and (not qsub) and (not rerun):
-            # if qsub, id should not be in cached
-            assert "70135" in cached
-    if jobs:
-        assert "7013474" in cached
-        assert "7013475" in cached
+# @pytest.mark.skip
+# @pytest.mark.parametrize(
+#     "valid",
+#     [
+#         # pytest.param(False,marks=pytest.mark.xfail(reason="Unrecognised batch system")),
+#         True
+#     ],
+# )
+# @pytest.mark.parametrize("jobs", [False, True])
+# @pytest.mark.parametrize("tracked", [False, True])
+# @pytest.mark.parametrize("rerun", [False, True])
+# @pytest.mark.parametrize("memkill", [False, True])
+# @pytest.mark.parametrize("wallkill", [False, True])
+# @pytest.mark.parametrize("qsub", [False, True])
+# def test_rerun(to_destroy, valid, jobs, tracked, rerun, memkill, wallkill, qsub):
+#     os.environ["SCHEDTOOLS_PROG"] = "rerun"
+#     to_destroy.append(os.path.dirname(RERUN_TRACKED_CACHE))
+#     handler = DummyHandler(
+#         valid=valid,
+#         jobs=jobs,
+#         tracked=tracked,
+#         rerun=rerun,
+#         memkill=memkill,
+#         wallkill=wallkill,
+#         qsub=qsub,
+#     )
+#     rerun_jobs(
+#         handler=handler,
+#         logger=logging.getLogger(__name__).addHandler(logging.NullHandler()),
+#     )
+#     cached = []  # get_tracked_cache()
+#     if tracked:
+#         if memkill and (not qsub) and (not rerun):
+#             # if qsub, id should not be in cached
+#             assert "70134" in cached
+#         if wallkill and (not qsub) and (not rerun):
+#             # if qsub, id should not be in cached
+#             assert "70135" in cached
+#     if jobs:
+#         assert "7013474" in cached
+#         assert "7013475" in cached

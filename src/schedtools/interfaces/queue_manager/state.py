@@ -181,6 +181,14 @@ class ManagerState:
     def get_job(self, job_id: str) -> Job:
         return self.job_data.get(job_id)
 
+    def resubmit_alerted_jobs(self) -> None:
+        alerted = self.job_data.filter_state(JobState.ALERT)
+        for job in alerted:
+            self.workload_manager.resubmit_job(job)
+
+    def count_by_state(self, state: JobState) -> int:
+        return len(self.job_data.filter_state(state))
+
     @lru_cache(maxsize=None)
     def get_job_log(self, job_id: str) -> JobLog:
         job = self.get_job(job_id)
