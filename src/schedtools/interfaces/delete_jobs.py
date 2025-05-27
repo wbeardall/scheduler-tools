@@ -24,7 +24,7 @@ def delete_jobs():
     )
 
     parser.add_argument(
-        "job_ids",
+        "--job-ids",
         type=str,
         nargs="+",
         help="The IDs of the jobs to delete",

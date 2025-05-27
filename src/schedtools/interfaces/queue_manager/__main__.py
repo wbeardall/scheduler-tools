@@ -570,7 +570,7 @@ class JobDetailScreen(JobScriptScreen):
         match event.button.id:
             case "job-detail-delete-button":
                 try:
-                    self.state.workload_manager.delete_job(self.job)
+                    self.state.shell_handler.delete_jobs([self.job.id])
                     self.state.evict_current_queue()
                     self.browser_handle.populate_table()
                     self.app.pop_screen()

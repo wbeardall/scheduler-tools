@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import paramiko
 
@@ -19,6 +19,7 @@ SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
 VENV_BIN = os.path.join(".schedtools", ".venv", "bin")
 UPDATE_JOB_STATE = os.path.join(VENV_BIN, "update-job-state")
 SET_MISSING_ALERTS = os.path.join(VENV_BIN, "set-missing-alerts")
+DELETE_JOBS = os.path.join(VENV_BIN, "delete-jobs")
 
 
 class CommandHandler(ABC):
@@ -79,6 +80,12 @@ class LocalHandler(CommandHandler):
         from schedtools.interfaces.set_missing_alerts import set_missing_alerts
 
         set_missing_alerts()
+
+    def delete_jobs(self, job_ids: List[str]):
+        # Local import to avoid circular import
+        from schedtools.interfaces.delete_jobs import delete_jobs_impl
+
+        delete_jobs_impl(job_ids)
 
 
 class ShellHandler(CommandHandler):
@@ -183,3 +190,6 @@ class ShellHandler(CommandHandler):
 
     def set_missing_alerts(self):
         return self.execute(f"$HOME/{SET_MISSING_ALERTS}")
+
+    def delete_jobs(self, job_ids: List[str]):
+        return self.execute(f"$HOME/{DELETE_JOBS} --job-ids {' '.join(job_ids)}")
