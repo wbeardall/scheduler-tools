@@ -50,8 +50,11 @@ class Cluster(Enum):
 
     @classmethod
     def from_handler(cls, handler: HandlerProtocol) -> "Cluster":
-        result = handler.execute("qstat --version")
-        return cls._from_cmd_output(result.stdout)
+        try:
+            result = handler.execute("qstat --version")
+            return cls._from_cmd_output(result.stdout)
+        except Exception:
+            return cls.UNKNOWN
 
     @classmethod
     def from_local(cls) -> "Cluster":

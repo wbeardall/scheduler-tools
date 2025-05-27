@@ -27,6 +27,7 @@ class JobState(Enum):
     UNSUBMITTED = "unsubmitted"
     COMPLETED = "completed"
     FAILED = "failed"
+    ALERT = "alert"
 
     @classmethod
     def parse(cls, state: str) -> "JobState":
@@ -163,6 +164,12 @@ class JobSpec:
     def is_queued(self) -> bool:
         return self.state == JobState.QUEUED
 
+    @property
+    def percent_completion(self) -> int:
+        if self.state == JobState.COMPLETED:
+            return 100
+        return 0
+
     @classmethod
     def from_sqlite(cls, data: Mapping[str, Any]) -> "JobSpec":
         if not isinstance(data, dict):
@@ -287,6 +294,10 @@ class Job(JobSpec):
 
     @property
     def percent_completion(self):
+        if self.state == JobState.COMPLETED:
+            return 100
+        if self.state == JobState.FAILED:
+            return 0
         if self.resource_usage is not None and self.resource_usage.walltime:
             return (
                 100

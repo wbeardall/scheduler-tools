@@ -31,6 +31,7 @@ remote-command = "schedtools.interfaces.remote_command:remote_command"
 remove-service = "schedtools.interfaces.remove_service:remove_service"
 rerun = "schedtools.interfaces.rerun:rerun"
 schedtools-help = "schedtools.interfaces.help:help"
+set-missing-alerts = "schedtools.interfaces.set_missing_alerts:set_missing_alerts"
 storage-tracker = "schedtools.interfaces.storage_tracker:storage_tracker"
 update-job-state = "schedtools.interfaces.update_job_state:update_job_state"
 

@@ -28,6 +28,7 @@ from schedtools.interfaces.queue_manager.state import (
     ManagerState,
     can_elevate_job,
     can_resubmit_job,
+    get_live_icon,
 )
 from schedtools.utils import get_any_identifier
 
@@ -292,6 +293,7 @@ class URLPromptScreen(Screen):
 class JobBrowserScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back to host selection")]
     state: ManagerState
+    _columns_set: bool = False
 
     def __init__(self, state: ManagerState, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -371,7 +373,9 @@ class JobBrowserScreen(Screen):
         # For now, doing it directly for simplicity in prototyping
         queued_jobs = self.state.job_data
 
-        table.add_columns("Live", *[prettify(col) for col in columns])
+        if not self._columns_set:
+            table.add_columns("Live", *[prettify(col) for col in columns])
+            self._columns_set = True
 
         table.loading = False
 
@@ -383,7 +387,7 @@ class JobBrowserScreen(Screen):
             table.add_row(
                 # If the job is a Job object, it is live (i.e. queued with the scheduler as opposed to
                 # simply being registered as a job spec)
-                "🟢" if isinstance(job, Job) else "🔴",
+                get_live_icon(job),
                 *[
                     self.prettify_enum_only(get_attr_or(job, col, "-"))
                     for col in columns
@@ -550,13 +554,18 @@ class JobDetailScreen(JobScriptScreen):
                 #     )
                 # )
             case "job-detail-resubmit-button":
-                try:
-                    self.state.workload_manager.submit_job(self.job)
-                    self.state.evict_current_queue()
-                    self.browser_handle.populate_table()
-                    self.app.pop_screen()
-                except Exception as e:
-                    self.notify(f"❌ Error resubmitting job: {e}")
+                if can_resubmit_job(self.job):
+                    try:
+                        self.state.workload_manager.resubmit_job(self.job)
+                        self.state.evict_current_queue()
+                        self.browser_handle.populate_table()
+                        self.app.pop_screen()
+                    except Exception as e:
+                        self.notify(f"❌ Error resubmitting job: {e}")
+                else:
+                    self.notify(
+                        f"❌ Job in state '{self.job.state}' cannot be resubmitted."
+                    )
             case "job-detail-back-button":
                 self.app.pop_screen()
             case "job-detail-log-button":

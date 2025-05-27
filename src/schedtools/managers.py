@@ -81,6 +81,12 @@ class WorkloadManager(ABC):
             return Queue(queue.jobs)
 
     def _submit_job_impl(self, job: JobSpec):
+        if job.cluster == Cluster.UNKNOWN:
+            raise ValueError("Cannot submit job on unknown cluster.")
+        if job.cluster != self.handler.cluster:
+            raise ValueError(
+                f"Cannot submit job on cluster '{job.cluster}' with handler for cluster '{self.handler.cluster}'."
+            )
         args = [
             "-v",
             # In PBS, environment variables must be passed as a comma-separated

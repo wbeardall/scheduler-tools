@@ -4,17 +4,22 @@ import subprocess
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from enum import Enum
+from functools import cached_property
 from typing import Optional, Union
 
 import paramiko
 
+from schedtools.clusters import Cluster
+from schedtools.interfaces import set_missing_alerts
 from schedtools.schemas import JobState
 from schedtools.sql import update_job_state
 from schedtools.utils import connect_to_host, escape_literal
 
 SSHResult = namedtuple("SSHResult", ["stdin", "stdout", "stderr", "returncode"])
 
-UPDATE_JOB_STATE = os.path.join(".schedtools", ".venv", "bin", "update-job-state")
+VENV_BIN = os.path.join(".schedtools", ".venv", "bin")
+UPDATE_JOB_STATE = os.path.join(VENV_BIN, "update-job-state")
+SET_MISSING_ALERTS = os.path.join(VENV_BIN, "set-missing-alerts")
 
 
 class CommandHandler(ABC):
@@ -65,6 +70,9 @@ class LocalHandler(CommandHandler):
             job_id=job_id,
             on_fail=on_fail,
         )
+
+    def set_missing_alerts(self):
+        set_missing_alerts()
 
 
 class ShellHandler(CommandHandler):
@@ -166,3 +174,10 @@ class ShellHandler(CommandHandler):
         return self.execute(
             f"$HOME/{UPDATE_JOB_STATE} --job-id {job_id} --state {state} {comment_arg} --on-fail {on_fail}"
         )
+
+    def set_missing_alerts(self):
+        return self.execute(f"$HOME/{SET_MISSING_ALERTS}")
+
+    @cached_property
+    def cluster(self) -> Cluster:
+        return Cluster.from_handler(self)

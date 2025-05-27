@@ -8,7 +8,7 @@ import paramiko
 
 from schedtools.clusters import Cluster
 from schedtools.managers import WorkloadManager, get_workload_manager
-from schedtools.schemas import Job, JobState, Queue
+from schedtools.schemas import Job, JobSpec, JobState, Queue
 from schedtools.shell_handler import ShellHandler
 from schedtools.utils import connect_from_attrs, connect_to_host
 
@@ -179,6 +179,10 @@ class ManagerState:
     def get_job(self, job_id: str) -> Job:
         return self.job_data.get(job_id)
 
+    def set_missing_alerts(self) -> None:
+        """Set alerts for jobs that are marked as queued but not in the scheduler queue."""
+        self.shell_handler.set_missing_alerts()
+
     @lru_cache(maxsize=None)
     def get_job_log(self, job_id: str) -> JobLog:
         job = self.get_job(job_id)
@@ -218,4 +222,16 @@ def can_elevate_job(job: Job) -> bool:
 
 
 def can_resubmit_job(job: Job) -> bool:
-    return job.state == JobState.FAILED
+    return job.state in [JobState.FAILED, JobState.ALERT]
+
+
+def get_live_icon(job: Union[Job, JobSpec]) -> str:
+    if job.state == JobState.COMPLETED:
+        return "✅"
+    if job.state == JobState.FAILED:
+        return "❌"
+    if job.state == JobState.ALERT:
+        return "⚠️"
+    if isinstance(job, Job):
+        return "🟢"
+    return "🔴"

@@ -99,6 +99,10 @@ class JobTrackingQueue(Queue):
         with job_tracking_queue(handler, write_back=False) as queue:
             return queue
 
+    @classmethod
+    def from_local(cls) -> "JobTrackingQueue":
+        return cls(db=default_db_path)
+
 
 @contextmanager
 def job_tracking_queue(
