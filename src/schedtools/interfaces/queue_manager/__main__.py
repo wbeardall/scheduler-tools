@@ -327,7 +327,6 @@ class JobBrowserScreen(Screen):
 
     @work(thread=True, exclusive=True)
     def fetch_jobs(self) -> None:
-        self.state.set_missing_alerts()
         _ = self.state.job_data
         # on_worker_state_changed will now fire
 

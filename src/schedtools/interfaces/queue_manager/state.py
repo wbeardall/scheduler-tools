@@ -154,6 +154,8 @@ class ManagerState:
     @property
     def job_data(self) -> Queue:
         if self.selected_hostname not in self.queues:
+            # Always force a refresh of the job data on remote before pulling
+            self.shell_handler.set_missing_alerts()
             cached_queue = self.workload_manager.get_cluster_jobs_from_db()
             queue = self.workload_manager.get_jobs()
 
@@ -178,10 +180,6 @@ class ManagerState:
 
     def get_job(self, job_id: str) -> Job:
         return self.job_data.get(job_id)
-
-    def set_missing_alerts(self) -> None:
-        """Set alerts for jobs that are marked as queued but not in the scheduler queue."""
-        self.shell_handler.set_missing_alerts()
 
     @lru_cache(maxsize=None)
     def get_job_log(self, job_id: str) -> JobLog:
