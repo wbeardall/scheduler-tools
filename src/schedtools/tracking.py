@@ -70,7 +70,7 @@ class JobTrackingQueue(Queue):
             raise TypeError(f"Invalid type for jobs: {type(jobs)}")
 
         for job in jobs:
-            if job.id in self.jobs:
+            if job in self.jobs:
                 if on_conflict == "update":
                     warnings.warn(
                         f"Job {job.id} already registered. It will be overwritten."
