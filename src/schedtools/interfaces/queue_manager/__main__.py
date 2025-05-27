@@ -438,7 +438,7 @@ class JobBrowserScreen(Screen):
             JobDetailScreen(
                 state=self.state,
                 browser_handle=self,
-                job_id=event.row_key,
+                job_id=event.row_key.value,
             )
         )
 
