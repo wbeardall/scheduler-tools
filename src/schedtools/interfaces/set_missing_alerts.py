@@ -14,7 +14,8 @@ def set_missing_alerts():
     workload_manager = get_workload_manager(local_handler)
     scheduler_queue = workload_manager.get_jobs()
 
-    for job in queue.filter_state(JobState.QUEUED):
+    # Check for queued or running jobs that are not in the scheduler queue
+    for job in queue.filter_state([JobState.QUEUED, JobState.RUNNING]):
         # Ensure the job is up to date
         job = queue.pull_updated(job)
         if job not in scheduler_queue:
