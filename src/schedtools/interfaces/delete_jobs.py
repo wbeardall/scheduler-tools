@@ -1,4 +1,5 @@
 import argparse
+import warnings
 from typing import List
 
 from schedtools.managers import get_workload_manager
@@ -13,8 +14,11 @@ def delete_jobs_impl(job_ids: List[str]):
     scheduler_queue = workload_manager.get_jobs()
     for job_id in job_ids:
         job = queue.pull_updated(job_id)
-        if job in scheduler_queue:
-            workload_manager.delete_job(job)
+        try:
+            scheduled_job = scheduler_queue.get(job.id)
+            workload_manager.delete_job(scheduled_job)
+        except KeyError:
+            warnings.warn(f"Job {job.id} not found in scheduler queue")
         queue.pop(job.id)
 
 
