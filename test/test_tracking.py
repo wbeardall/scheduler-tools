@@ -89,6 +89,24 @@ def test_job_tracking_update(db_conn):
     assert rows[0]["state"] == JobState.COMPLETED.value
 
 
+def test_job_tracking_delete(db_conn):
+    job = JobSpec.from_unsubmitted(
+        jobscript_path="test",
+        experiment_path="/tmp/test-output",
+        cluster="cx3",
+    )
+
+    queue = JobTrackingQueue(db=db_conn)
+    queue.register(job)
+    assert job in queue
+    rows = db_conn.execute("SELECT * FROM jobs").fetchall()
+    assert len(rows) == 1
+    queue.pop(job.id)
+    assert job not in queue
+    rows = db_conn.execute("SELECT * FROM jobs").fetchall()
+    assert len(rows) == 0
+
+
 def test_job_tracking_queue(db_path):
     queue = JobTrackingQueue(db=db_path)
     job = JobSpec.from_unsubmitted(

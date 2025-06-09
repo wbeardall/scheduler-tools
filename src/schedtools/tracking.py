@@ -88,11 +88,12 @@ class JobTrackingQueue(Queue):
         for row in cursor:
             self.jobs.append(JobSpec.from_sqlite(row))
 
-    def pull_updated(self, job: JobSpec) -> JobSpec:
-        cursor = self.conn.execute("SELECT * FROM jobs WHERE id = ?", (job.id,))
+    def pull_updated(self, job: Union[JobSpec, str]) -> JobSpec:
+        job_id = job.id if isinstance(job, JobSpec) else job
+        cursor = self.conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
         row = cursor.fetchone()
         if row is None:
-            raise KeyError(f"Job {job.id} not found")
+            raise KeyError(f"Job {job_id} not found")
 
         job = JobSpec.from_sqlite(row)
         self.register(job, on_conflict="update")
