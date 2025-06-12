@@ -90,7 +90,7 @@ def queue_task(file: str):
                 payload=json_payload,
             )
             if submit:
-                subprocess.run(["qsub"], input=job_script, check=True)
+                subprocess.run(["qsub"], input=job_script.encode(), check=True)
             else:
                 print(job_script)
 
