@@ -138,7 +138,7 @@ class JobScript:
             [
                 "#!/bin/sh",
                 f"#PBS -l walltime={self.walltime}",
-                f"#PBS -l select={self.nodes}:ncpus={self.ncpus}:mem={self.mem_per_cpu*self.ncpus}mb:ngpus={self.ngpus}:gpu_type={self.gpu_type}",
+                f"#PBS -l select={self.nodes}:ncpus={self.ncpus}:mem={self.mem_per_cpu * self.ncpus}mb:ngpus={self.ngpus}:gpu_type={self.gpu_type}",
             ]
         )
 

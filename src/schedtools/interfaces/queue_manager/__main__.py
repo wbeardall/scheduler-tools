@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import Any, Union
+from functools import partial
+from typing import Any, Callable, Union
 
 import paramiko
 from textual import work
@@ -8,6 +9,7 @@ from textual.containers import Center, Container, Horizontal, ScrollableContaine
 from textual.screen import Screen
 from textual.widgets import (
     Button,
+    ContentSwitcher,
     DataTable,
     Footer,
     Header,
@@ -18,18 +20,22 @@ from textual.widgets import (
     Log,
     Pretty,
     ProgressBar,
+    RadioButton,
+    RadioSet,
     Static,
 )
 from textual.worker import Worker, WorkerState
 
 from schedtools.interfaces.queue_manager.state import (
     Job,
+    JobFilter,
     JobLog,
     ManagerState,
     can_elevate_job,
     can_resubmit_job,
     get_live_icon,
 )
+from schedtools.interfaces.queue_manager.utils import prettify
 from schedtools.schemas import JobState
 from schedtools.utils import get_any_identifier
 
@@ -304,7 +310,7 @@ class JobBrowserScreen(Screen):
         yield Header()
         with Container(id="job-browser-screen", classes="screen-container"):
             yield Label(
-                f"Job Queue for {self.state.selected_host.name}",
+                self.screen_title,
                 id="job-browser-title",
                 classes="screen-title",
             )
@@ -317,9 +323,21 @@ class JobBrowserScreen(Screen):
                     classes="left-button",
                 )
                 yield Button(
-                    "⚠️ Resubmit Alerted Jobs",
+                    "🔍 Filter",
+                    variant="primary",
+                    id="job-browser-filter-button",
+                    classes="action-button",
+                )
+                yield Button(
+                    "⚠️ Resubmit Filtered Jobs",
                     variant="warning",
-                    id="job-browser-resubmit-alerted-button",
+                    id="job-browser-resubmit-filtered-button",
+                    classes="action-button",
+                )
+                yield Button(
+                    "❌ Delete Filtered Jobs",
+                    variant="error",
+                    id="job-browser-delete-filtered-button",
                     classes="action-button",
                 )
                 yield Static()
@@ -337,9 +355,17 @@ class JobBrowserScreen(Screen):
         _ = self.state.job_data
         # on_worker_state_changed will now fire
 
-    @work(thread=True, exclusive=True, name="resubmit-alerted-jobs")
-    def resubmit_alerted_jobs(self) -> None:
-        self.state.resubmit_alerted_jobs()
+    @work(thread=True, exclusive=True, name="resubmit-filtered-jobs")
+    def resubmit_filtered_jobs(self) -> None:
+        self.state.resubmit_filtered_jobs()
+
+    @work(thread=True, exclusive=True, name="delete-filtered-jobs")
+    def delete_filtered_jobs(self, expected_count: int) -> None:
+        self.state.delete_filtered_jobs(expected_count)
+
+    @property
+    def screen_title(self) -> str:
+        return f"Job Queue for {self.state.selected_host.name} ({self.state.filter})"
 
     def on_mount(self) -> None:
         self.populate_table()
@@ -348,13 +374,17 @@ class JobBrowserScreen(Screen):
         table = self.query_one("#job-table", DataTable)
         table.loading = True
         table.refresh()
+        title = self.query_one("#job-browser-title", Label)
+        title.update(self.screen_title)
         self.fetch_jobs()
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         if event.worker.name == "fetch-jobs":
             self.fetch_jobs_hook(event)
-        elif event.worker.name == "resubmit-alerted-jobs":
-            self.resubmit_alerted_jobs_hook(event)
+        elif event.worker.name == "resubmit-filtered-jobs":
+            self.resubmit_filtered_jobs_hook(event)
+        elif event.worker.name == "delete-filtered-jobs":
+            self.delete_filtered_jobs_hook(event)
 
     def fetch_jobs_hook(self, event: Worker.StateChanged) -> None:
         if event.state == WorkerState.SUCCESS:
@@ -365,27 +395,60 @@ class JobBrowserScreen(Screen):
             table.refresh()
             self.notify(f"Error fetching jobs: {event.error}")
 
-    def resubmit_alerted_jobs_hook(self, event: Worker.StateChanged) -> None:
+    def resubmit_filtered_jobs_hook(self, event: Worker.StateChanged) -> None:
         if event.state == WorkerState.SUCCESS:
-            self.notify("Alerted jobs resubmitted.")
+            self.notify(f"Resubmitted {len(self.state.job_data)} jobs.")
             self.state.evict_current_queue()
             self.populate_table()
         elif event.state == WorkerState.ERROR:
-            self.notify(f"Error resubmitting alerted jobs: {event.error}")
+            self.notify(f"Error resubmitting filtered jobs: {event.error}")
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "job-browser-back-button":
-            self.app.pop_screen()
-        elif event.button.id == "job-browser-resubmit-alerted-button":
-            alerted_count = self.state.count_by_state(JobState.ALERT)
-            if alerted_count > 0:
-                self.notify(f"Resubmitting {alerted_count} alerted jobs...")
-                self.state.resubmit_alerted_jobs()
-            else:
-                self.notify("No alerted jobs found.")
-        elif event.button.id == "job-browser-refresh-button":
+    def delete_filtered_jobs_hook(self, event: Worker.StateChanged) -> None:
+        if event.state == WorkerState.SUCCESS:
+            self.notify(f"Deleted {len(self.state.job_data)} jobs.")
             self.state.evict_current_queue()
             self.populate_table()
+        elif event.state == WorkerState.ERROR:
+            self.notify(f"Error deleting filtered jobs: {event.error}")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "job-browser-back-button":
+                self.app.pop_screen()
+            case "job-browser-resubmit-filtered-button":
+                if self.state.filter.is_empty:
+                    self.notify(
+                        "No filter set. Blanket resubmission not allowed for safety reasons."
+                    )
+                else:
+                    self.app.push_screen(
+                        ConfirmationScreen(
+                            callback=self.resubmit_filtered_jobs,
+                            message=f"Resubmit {len(self.state.job_data)} jobs?",
+                        )
+                    )
+            case "job-browser-delete-filtered-button":
+                if self.state.filter.is_empty:
+                    self.notify(
+                        "No filter set. Blanket deletion not allowed for safety reasons."
+                    )
+                else:
+                    self.app.push_screen(
+                        ConfirmationScreen(
+                            callback=partial(
+                                self.delete_filtered_jobs, len(self.state.job_data)
+                            ),
+                            message=f"Delete {len(self.state.job_data)} jobs?",
+                            required_phrase="confirm delete jobs",
+                        )
+                    )
+            case "job-browser-filter-button":
+                self.app.push_screen(
+                    JobFilterScreen(state=self.state, browser_handle=self)
+                )
+            case "job-browser-refresh-button":
+                self.state.evict_current_queue()
+                self.populate_table()
 
     def display_table(self) -> None:
         table = self.query_one("#job-table", DataTable)
@@ -441,6 +504,178 @@ class JobBrowserScreen(Screen):
                 job_id=event.row_key.value,
             )
         )
+
+
+class JobFilterScreen(Screen):
+    state: ManagerState
+    browser_handle: JobBrowserScreen
+
+    def __init__(
+        self, *args, state: ManagerState, browser_handle: JobBrowserScreen, **kwargs
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.state = state
+        self.browser_handle = browser_handle
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Container(id="job-filter-screen", classes="screen-container"):
+            with Center():
+                with Container(id="job-filter-content", classes="centered-container"):
+                    yield Label(
+                        "Filter Jobs", id="job-filter-title", classes="screen-title"
+                    )
+
+                    with Horizontal(
+                        id="job-filter-buttons", classes="button-container"
+                    ):
+                        yield Button(
+                            "State",
+                            id="job-filter-state-button",
+                            classes="filter-button",
+                        )
+                        yield Button(
+                            "Name",
+                            id="job-filter-name-button",
+                            classes="filter-button",
+                        )
+                    with ContentSwitcher(initial="job-filter-state-radio-set"):
+                        yield RadioSet(
+                            *[
+                                RadioButton(
+                                    label=prettify(state), value=False, name=state.value
+                                )
+                                for state in JobState
+                            ],
+                            id="job-filter-state-radio-set",
+                        )
+                        yield Input(
+                            placeholder="Filter by name",
+                            id="job-filter-name-input",
+                        )
+                    with Horizontal(id="action-buttons", classes="button-container"):
+                        yield Button(
+                            "⬅️ Back",
+                            variant="primary",
+                            id="job-filter-back-button",
+                            classes="left-button",
+                        )
+                        yield Button(
+                            "🔄 Reset",
+                            variant="primary",
+                            id="job-filter-reset-button",
+                            classes="action-button",
+                        )
+                        yield Button(
+                            "✅ Apply",
+                            variant="primary",
+                            id="job-filter-apply-button",
+                            classes="right-button",
+                        )
+        yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "job-filter-state-button":
+                self.query_one(ContentSwitcher).current = "job-filter-state-radio-set"
+            case "job-filter-name-button":
+                self.query_one(ContentSwitcher).current = "job-filter-name-input"
+            case "job-filter-reset-button":
+                self.reset_filter()
+            case "job-filter-back-button":
+                self.app.pop_screen()
+            case "job-filter-apply-button":
+                self.apply_filter()
+                # Populate the table with the filtered jobs (NOTE: do not evict the queue)
+                self.browser_handle.populate_table()
+                self.app.pop_screen()
+
+    def reset_filter(self) -> None:
+        state_radio = self.query_one("#job-filter-state-radio-set", RadioSet)
+        # Following https://github.com/Textualize/textual/blob/main/src/textual/widgets/_radio_set.py
+        buttons = state_radio.query(RadioButton)
+        with state_radio.prevent(RadioButton.Changed):
+            for button in buttons:
+                button.value = False
+            state_radio._pressed_button = None
+        self.query_one("#job-filter-name-input", Input).value = ""
+
+    def apply_filter(self) -> None:
+        state_button = self.query_one(
+            "#job-filter-state-radio-set", RadioSet
+        ).pressed_button
+        state = None if state_button is None else JobState(state_button.name)
+        name = self.query_one("#job-filter-name-input", Input).value
+        self.state.set_filter(JobFilter(state=state, name=name))
+
+
+class ConfirmationScreen(Screen):
+    BINDINGS = [("escape", "app.pop_screen", "Back")]
+    callback: Callable[[], None]
+    message: str
+    required_phrase: str
+
+    def __init__(
+        self,
+        *args,
+        callback: Callable[[], None],
+        message: str,
+        required_phrase: str = "confirm",
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.callback = callback
+        self.message = message
+        self.required_phrase = required_phrase
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Container(id="confirmation-screen", classes="screen-container"):
+            with Center():
+                with Container(id="confirmation-content", classes="centered-container"):
+                    yield Label(
+                        self.message, id="confirmation-message", classes="screen-title"
+                    )
+                    yield Input(
+                        placeholder=f"Type '{self.required_phrase}' to proceed",
+                        id="confirmation-input",
+                    )
+                    with Horizontal(
+                        id="confirmation-buttons", classes="button-container"
+                    ):
+                        yield Button(
+                            "✅ Confirm",
+                            variant="primary",
+                            id="confirmation-confirm-button",
+                            classes="right-button",
+                        )
+                        yield Button(
+                            "❌ Cancel",
+                            variant="primary",
+                            id="confirmation-cancel-button",
+                            classes="left-button",
+                        )
+        yield Footer()
+
+    def submit_if_confirmed(self) -> None:
+        input_field = self.query_one("#confirmation-input", Input)
+        if input_field.value == self.required_phrase:
+            self.callback()
+            self.app.pop_screen()
+        else:
+            self.notify(f"Please type '{self.required_phrase}' to proceed.")
+            input_field.value = ""
+            input_field.focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.submit_if_confirmed()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "confirmation-confirm-button":
+                self.submit_if_confirmed()
+            case "confirmation-cancel-button":
+                self.app.pop_screen()
 
 
 class JobScriptScreen(Screen):
@@ -570,12 +805,16 @@ class JobDetailScreen(JobScriptScreen):
         match event.button.id:
             case "job-detail-delete-button":
                 try:
-                    self.state.shell_handler.delete_jobs([self.job.id])
+                    response = self.state.shell_handler.delete_jobs([self.job.id])
+                    if response.returncode != 0:
+                        self.notify(
+                            f"❌ Error deleting job: {str(response.stderr)}"[:300]
+                        )
                     self.state.evict_current_queue()
                     self.browser_handle.populate_table()
                     self.app.pop_screen()
                 except Exception as e:
-                    self.notify(f"❌ Error deleting job: {e}")
+                    self.notify(f"❌ Error deleting job: {str(e)}"[:300])
             case "job-detail-elevate-button":
                 self.notify("Job elevation is not implemented.")
                 # self.app.push_screen(
@@ -755,12 +994,6 @@ class ManagerApp(App):
 
     def on_mount(self) -> None:
         self.push_screen(HostSelectionScreen(state=self.state))
-
-
-def prettify(s: Union[str, Enum]) -> str:
-    if isinstance(s, Enum):
-        s = s.value
-    return s.replace("_", " ").title()
 
 
 def main():

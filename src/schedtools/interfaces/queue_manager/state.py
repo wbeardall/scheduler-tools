@@ -68,6 +68,26 @@ class JobLog:
     close: bool = False
 
 
+@dataclass
+class JobFilter:
+    state: Union[JobState, None] = None
+    name: Union[str, None] = None
+
+    @property
+    def is_empty(self) -> bool:
+        return self.state is None and self.name is None
+
+    def __str__(self) -> str:
+        if self.is_empty:
+            return "All jobs"
+        clauses = []
+        if self.state is not None:
+            clauses.append(f"state = {self.state.value}")
+        if self.name is not None:
+            clauses.append(f"name matches '{self.name}'")
+        return ", ".join(clauses)
+
+
 class ManagerState:
     ssh: paramiko.SSHConfig
     selected_hostname: str | None = None
@@ -76,6 +96,7 @@ class ManagerState:
     added_hosts: Dict[str, Host]
     queues: Dict[str, Queue]
     cluster_map: Dict[str, Cluster]
+    filter: JobFilter
 
     def __init__(self):
         self.ssh = paramiko.SSHConfig()
@@ -86,6 +107,7 @@ class ManagerState:
         self.added_hosts = {}
         self.queues = {}
         self.cluster_map = {}
+        self.filter = JobFilter()
 
     @cached_property
     def _config_hosts(self) -> Dict[str, Host]:
@@ -164,7 +186,36 @@ class ManagerState:
 
             queue = cached_queue.merge(queue)
             self.queues[self.selected_hostname] = queue
-        return self.queues[self.selected_hostname]
+        return self.apply_filter(self.queues[self.selected_hostname])
+
+    def apply_filter(self, queue: Queue) -> Queue:
+        if self.filter is None:
+            return queue
+        if self.filter.state is not None:
+            queue = queue.filter_state(self.filter.state)
+        if self.filter.name is not None:
+            queue = queue.filter_name(self.filter.name)
+        return queue
+
+    def set_filter(self, filter: JobFilter) -> None:
+        self.filter = filter
+
+    def resubmit_filtered_jobs(self) -> None:
+        if self.filter is None or self.filter.is_empty:
+            raise ValueError("No filter set.")
+        jobs = self.job_data
+        for job in jobs:
+            self.workload_manager.resubmit_job(job)
+
+    def delete_filtered_jobs(self, expected_count: int) -> None:
+        if self.filter is None or self.filter.is_empty:
+            raise ValueError("No filter set.")
+        jobs = self.job_data
+        if len(jobs) != expected_count:
+            raise ValueError(
+                f"Expected {expected_count} jobs, got {len(jobs)}. Exiting for safety."
+            )
+        self.shell_handler.delete_jobs([job.id for job in jobs])
 
     @property
     def selected_host(self) -> Host:

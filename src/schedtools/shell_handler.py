@@ -92,6 +92,7 @@ class ShellHandler(CommandHandler):
     def __init__(self, ssh: Union[paramiko.SSHClient, str], **kwargs):
         if not isinstance(ssh, paramiko.SSHClient):
             ssh = connect_to_host(ssh, **kwargs)
+
         self.ssh = ssh
         channel = self.ssh.invoke_shell()
         self.stdin = channel.makefile("wb")

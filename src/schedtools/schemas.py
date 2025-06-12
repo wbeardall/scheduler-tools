@@ -1,6 +1,8 @@
 import copy
 import os
+import re
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -452,14 +454,18 @@ class Queue:
             return Queue([j for j in self if j.owner_name == owner])
 
     def filter_state(self, states: Union[JobState, List[JobState]]) -> "Queue":
-        if isinstance(states, JobState):
+        if not isinstance(states, Iterable):
             states = [states]
+        states = [el if isinstance(el, JobState) else JobState(el) for el in states]
         return Queue([j for j in self if j.state in states])
 
     def filter_id(self, ids: Union[str, List[str]]) -> "Queue":
         if isinstance(ids, str):
             ids = [ids]
         return Queue([j for j in self if j.id in ids])
+
+    def filter_name(self, pattern: str) -> "Queue":
+        return Queue([j for j in self if re.search(pattern, j.name)])
 
     def filter_cluster(self, cluster: Union[Cluster, str]) -> "Queue":
         if isinstance(cluster, Cluster):

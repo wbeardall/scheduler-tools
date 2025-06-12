@@ -6,7 +6,7 @@ name = "scheduler-tools"
 version = "0.0.1"
 description = "Basic tools for automating some PBS work. In progress, and potentially unsafe."
 readme = "README.md"
-requires-python = ">=3.8.1"
+requires-python = ">=3.10"
 dependencies = [
     "apscheduler>=3.11.0",
     "paramiko>=3.5.1",
@@ -35,7 +35,7 @@ schedtools-help = "schedtools.interfaces.help:help"
 set-missing-alerts = "schedtools.interfaces.set_missing_alerts:set_missing_alerts"
 storage-tracker = "schedtools.interfaces.storage_tracker:storage_tracker"
 update-job-state = "schedtools.interfaces.update_job_state:update_job_state"
-
+zip-experiments = "schedtools.interfaces.tasks.zip_experiments:zip_experiments"
 
 [dependency-groups]
 dev = [
