@@ -50,6 +50,11 @@ JOBSCRIPT_TEMPLATE = """
 """
 
 
+@click.group("tasks")
+def tasks():
+    pass
+
+
 def queue_task(file: str):
     """
     Decorator to create a click group for a function that can be queued to PBS.
@@ -65,8 +70,8 @@ def queue_task(file: str):
             else:
                 params.append(click.option(f"--{name}", default=param.default))
 
-        @click.group(fn.__name__)
-        def cli():
+        @tasks.group(fn.__name__)
+        def group():
             pass
 
         @click.option("--submit", is_flag=True)
@@ -92,9 +97,9 @@ def queue_task(file: str):
         for param in reversed(params):
             queue = param(queue)
 
-        queue = cli.command("queue")(queue)
+        queue = group.command("queue")(queue)
 
-        @cli.command("execute")
+        @group.command("execute")
         @click.argument("payload_json", type=str)
         @click.pass_context
         def execute(ctx, payload_json):
@@ -102,6 +107,6 @@ def queue_task(file: str):
             kwargs = {k: v for k, v in payload.items() if k in sig.parameters}
             fn(**kwargs)
 
-        return cli
+        return group
 
     return decorator

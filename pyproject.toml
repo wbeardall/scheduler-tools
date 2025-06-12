@@ -35,7 +35,7 @@ schedtools-help = "schedtools.interfaces.help:help"
 set-missing-alerts = "schedtools.interfaces.set_missing_alerts:set_missing_alerts"
 storage-tracker = "schedtools.interfaces.storage_tracker:storage_tracker"
 update-job-state = "schedtools.interfaces.update_job_state:update_job_state"
-zip-experiments = "schedtools.interfaces.tasks.zip_experiments:zip_experiments"
+run-task = "schedtools.interfaces.tasks.__main__:tasks"
 
 [dependency-groups]
 dev = [
