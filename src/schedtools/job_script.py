@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Union
 
-from schedtools.utils import RevDict, memory_to
+from schedtools.parsing import memory_to
+from schedtools.utils import RevDict
 
 _recommended_directives = {"SLURM": {"cpus-per-task": 42}}
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import click
 
-from schedtools.utils import memory_to, walltime_to
+from schedtools.parsing import memory_to, walltime_to
 
 default_nodes = 1
 default_ncpus = 4
