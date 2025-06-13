@@ -11,7 +11,7 @@ from schedtools.parsing import memory_to, walltime_to
 
 default_nodes = 1
 default_ncpus = 4
-default_mem = "4gb"
+default_mem = "8gb"
 default_walltime = "01:00:00"
 
 
