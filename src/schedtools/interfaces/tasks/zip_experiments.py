@@ -29,13 +29,17 @@ def build_zip(
     logger.info(f"Zipping {path} into {zip_file}.")
 
     with zipfile.ZipFile(zip_file, "a") as zf:
+        existing_files = set(zf.namelist())
         for root, _, files in os.walk(path):
             for file in files:
                 if any(pattern.search(file) for pattern in exclude_compiled):
-                    logger.debug(f"Skipping {file} in {path}.")
+                    logger.debug(f"Skipping '{file}' in '{path}'.")
                     continue
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, path)
+                if arcname in existing_files:
+                    logger.debug(f"Skipping duplicate '{arcname}' in '{path}'.")
+                    continue
                 zf.write(file_path, arcname)
 
 
