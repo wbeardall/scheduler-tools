@@ -1,29 +1,31 @@
-import logging
 import multiprocessing as mp
 import os
-import re
+from typing import List, Union
 
 from schedtools.compression import zip_experiment
 from schedtools.interfaces.tasks.task import queue_task
+from schedtools.schemas import JobState
+from schedtools.tracking import JobTrackingQueue
 
-logger = logging.getLogger(__name__)
+
+def get_all_completed_unzipped() -> List[str]:
+    queue = JobTrackingQueue.from_local()
+    dirs = []
+    for job in queue.jobs:
+        archive_path = job.experiment_path + ".zip"
+        if job.state == JobState.COMPLETED and not os.path.exists(archive_path):
+            dirs.append(job.experiment_path)
 
 
 @queue_task(__file__)
-def zip_experiments(path: str, pattern: str) -> None:
-    dirs = []
-    for d in os.listdir(path):
-        abspath = os.path.join(path, d)
-        conditions = [
-            os.path.isdir(abspath),
-            re.search(pattern, d),
-            os.path.exists(os.path.join(abspath, ".run_complete")),
-        ]
-        if all(conditions):
-            dirs.append(abspath)
+def zip_experiments(paths: Union[str, List[str], None] = None) -> None:
+    if paths is None:
+        paths = get_all_completed_unzipped()
+    elif isinstance(paths, str):
+        paths = [paths]
 
     with mp.Pool(mp.cpu_count()) as pool:
-        pool.map(zip_experiment, dirs)
+        pool.map(zip_experiment, paths)
 
 
 if __name__ == "__main__":
