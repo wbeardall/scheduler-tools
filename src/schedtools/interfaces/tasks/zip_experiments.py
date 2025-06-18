@@ -15,6 +15,7 @@ def get_all_completed_unzipped() -> List[str]:
         archive_path = job.experiment_path + ".zip"
         if job.state == JobState.COMPLETED and not os.path.exists(archive_path):
             dirs.append(job.experiment_path)
+    return dirs
 
 
 @queue_task(__file__)
