@@ -24,6 +24,9 @@ def zip_experiments(paths: Union[str, List[str], None] = None) -> None:
     elif isinstance(paths, str):
         paths = [paths]
 
+    # Filter to completed experiments
+    paths = [p for p in paths if os.path.exists(os.path.join(p, ".run_complete"))]
+
     with mp.Pool(mp.cpu_count()) as pool:
         pool.map(zip_experiment, paths)
 
