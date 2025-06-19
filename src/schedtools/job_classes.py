@@ -15,6 +15,14 @@ class JobClass:
     gpu_type: Union[str, None] = None
     description: Union[str, None] = None
 
+    @property
+    def ncpus(self):
+        return self.nodes * self.cpu_per_node
+
+    @property
+    def mem(self):
+        return self.memory_per_node * 1024
+
 
 class JobClasses:
     def __init__(self):
