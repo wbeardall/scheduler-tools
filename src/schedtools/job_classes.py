@@ -23,6 +23,10 @@ class JobClass:
     def mem(self):
         return self.memory_per_node * 1024
 
+    @property
+    def ngpus(self):
+        return self.gpus
+
 
 class JobClasses:
     def __init__(self):
