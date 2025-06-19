@@ -21,7 +21,8 @@ class JobClass:
 
     @property
     def mem(self):
-        return self.memory_per_node * 1024
+        # Memory is in GB
+        return self.nodes * self.memory_per_node
 
     @property
     def ngpus(self):
