@@ -4,6 +4,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Dict, Union
 
 import click
 
@@ -55,20 +56,35 @@ def tasks():
     pass
 
 
-def queue_task(file: str):
+def queue_task(file: str, param_dict: Union[Dict[str, click.Option], None] = None):
     """
     Decorator to create a click group for a function that can be queued to PBS.
 
+    `param_dict` is useful for specifying click options with non-trivial options, like multiple choices,
+    nargs, etc.
+
+    Args:
+        file: The file to run.
+        param_dict: A dictionary of parameters to add to the click group. If None,
+            the parameters will be inferred from the function signature.
+
+    Returns:
+        A click group that can be used to queue the function to PBS.
+
     """
+    if param_dict is None:
+        param_dict = {}
 
     def decorator(fn: Callable[[], None]) -> click.Group:
         sig = inspect.signature(fn)
-        params = []
         for name, param in sig.parameters.items():
-            if param.default is inspect.Parameter.empty:
-                params.append(click.option(f"--{name}", required=True))
-            else:
-                params.append(click.option(f"--{name}", default=param.default))
+            if name not in param_dict:
+                if param.default is inspect.Parameter.empty:
+                    param_dict[name] = click.option(f"--{name}", required=True)
+                else:
+                    param_dict[name] = click.option(f"--{name}", default=param.default)
+
+        params = list(param_dict.values())
 
         @tasks.group(fn.__name__)
         def group():

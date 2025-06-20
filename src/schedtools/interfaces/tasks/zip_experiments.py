@@ -1,6 +1,9 @@
 import multiprocessing as mp
 import os
+import warnings
 from typing import List, Union
+
+import click
 
 from schedtools.compression import zip_experiment
 from schedtools.interfaces.tasks.task import queue_task
@@ -14,11 +17,21 @@ def get_all_completed_unzipped() -> List[str]:
     for job in queue.jobs:
         archive_path = job.experiment_path + ".zip"
         if job.state == JobState.COMPLETED and not os.path.exists(archive_path):
-            dirs.append(job.experiment_path)
+            if os.path.exists(job.experiment_path):
+                dirs.append(job.experiment_path)
+            else:
+                warnings.warn(
+                    f"Experiment path does not exist: '{job.experiment_path}'"
+                )
     return dirs
 
 
-@queue_task(__file__)
+@queue_task(
+    __file__,
+    param_dict={
+        "paths": click.option("--paths", type=str, multiple=True, default=None)
+    },
+)
 def zip_experiments(paths: Union[str, List[str], None] = None) -> None:
     if paths is None:
         paths = get_all_completed_unzipped()
