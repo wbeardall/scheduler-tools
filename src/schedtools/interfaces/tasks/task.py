@@ -56,7 +56,10 @@ def tasks():
     pass
 
 
-def queue_task(file: str, param_dict: Union[Dict[str, click.Option], None] = None):
+def queue_task(
+    file: str,
+    param_dict: Union[Dict[str, click.Option], None] = None,
+):
     """
     Decorator to create a click group for a function that can be queued to PBS.
 

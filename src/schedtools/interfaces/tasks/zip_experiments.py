@@ -41,6 +41,10 @@ def zip_experiments(paths: Union[str, List[str], None] = None) -> None:
     # Filter to completed experiments
     paths = [p for p in paths if os.path.exists(os.path.join(p, ".run_complete"))]
 
+    if len(paths) == 0:
+        warnings.warn("No completed experiments found.")
+        return
+
     with mp.Pool(mp.cpu_count()) as pool:
         pool.map(zip_experiment, paths)
 

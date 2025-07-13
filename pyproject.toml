@@ -10,10 +10,12 @@ requires-python = ">=3.10"
 dependencies = [
     "apscheduler>=3.11.0",
     "click>=8.2.1",
+    "invoke>=2.2.0",
     "paramiko>=3.5.1",
     "python-daemon>=3.1.2",
     "regex>=2024.11.6",
     "rich>=14.0.0",
+    "textual>=3.2.0",
 ]
 
 [project.optional-dependencies]

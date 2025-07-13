@@ -196,10 +196,10 @@ class PBS(WorkloadManager):
                     section = {}
                 section_name, stat_name = stat_name.split()
             section[stat_name] = dict(
-                used=re.findall("[0-9]+\.{0,1}[0-9]*[kMGTP](?=B{0,1} of)", tail)[0],
-                total=re.findall("(?<=of )[0-9]+\.{0,1}[0-9]*[kMGTP]", tail)[0],
+                used=re.findall(r"[0-9]+\.{0,1}[0-9]*[kMGTP](?=B{0,1} of)", tail)[0],
+                total=re.findall(r"(?<=of )[0-9]+\.{0,1}[0-9]*[kMGTP]", tail)[0],
                 percent_used=float(
-                    re.findall("(?<=\()[0-9]+\.{0,1}[0-9]*(?=\%\))", tail)[0]
+                    re.findall(r"(?<=\()[0-9]+\.{0,1}[0-9]*(?=\%\))", tail)[0]
                 ),
             )
         return stats

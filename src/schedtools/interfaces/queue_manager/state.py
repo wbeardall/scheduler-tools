@@ -103,6 +103,8 @@ class ManagerState:
         self.ssh.parse(
             open(os.environ.get("SSH_CONFIG", os.path.expanduser("~/.ssh/config")))
         )
+        # Drop any entries without a hostname
+        self.ssh._config = [entry for entry in self.ssh._config if "host" in entry]
         self.kv_store = KVStore()
         self.added_hosts = {}
         self.queues = {}
