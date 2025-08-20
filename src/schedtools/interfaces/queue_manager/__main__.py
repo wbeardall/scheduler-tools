@@ -33,6 +33,7 @@ from schedtools.interfaces.queue_manager.state import (
     ManagerState,
     can_elevate_job,
     can_resubmit_job,
+    can_submit_job,
     get_live_icon,
 )
 from schedtools.interfaces.queue_manager.utils import prettify
@@ -863,6 +864,13 @@ class JobDetailScreen(JobScriptScreen):
                         id="job-detail-resubmit-button",
                         classes="action-button",
                     )
+                elif can_submit_job(self.job):
+                    yield Button(
+                        "☑️ Submit Job",
+                        variant="primary",
+                        id="job-detail-submit-button",
+                        classes="action-button",
+                    )
                 yield Static()
                 yield Button(
                     "🗑️ Delete Job",
@@ -907,6 +915,19 @@ class JobDetailScreen(JobScriptScreen):
                 else:
                     self.notify(
                         f"❌ Job in state '{self.job.state}' cannot be resubmitted."
+                    )
+            case "job-detail-submit-button":
+                if can_submit_job(self.job):
+                    try:
+                        self.state.workload_manager.submit_job(self.job)
+                        self.state.evict_current_queue()
+                        self.browser_handle.populate_table()
+                        self.app.pop_screen()
+                    except Exception as e:
+                        self.notify(f"❌ Error submitting job: {e}")
+                else:
+                    self.notify(
+                        f"❌ Job in state '{self.job.state}' cannot be submitted."
                     )
             case "job-detail-back-button":
                 self.app.pop_screen()
