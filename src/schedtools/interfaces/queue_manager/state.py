@@ -296,6 +296,8 @@ def can_resubmit_job(job: Job) -> bool:
 
 
 def get_live_icon(job: Union[Job, JobSpec]) -> str:
+    if job.state == JobState.UNSUBMITTED:
+        return "🔘"
     if job.state == JobState.COMPLETED:
         return "✅"
     if job.state == JobState.FAILED:
