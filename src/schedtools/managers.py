@@ -111,6 +111,12 @@ class WorkloadManager(ABC):
 
         return result
 
+    def register_job(self, job: JobSpec, *, conn: Optional[sqlite3.Connection] = None):
+        job.state = JobState.UNSUBMITTED
+        upsert_jobs(
+            conn or default_tracking_connection.get(), [job], on_conflict="update"
+        )
+
     def submit_job(
         self,
         job: JobSpec,
@@ -130,7 +136,10 @@ class WorkloadManager(ABC):
             self.logger.error(msg)
             raise JobSubmissionError(msg)
 
-    def resubmit_job(self, job: Job):
+    def resubmit_job(
+        self,
+        job: Job,
+    ):
         result = self._submit_job_impl(job)
 
         if result.returncode:

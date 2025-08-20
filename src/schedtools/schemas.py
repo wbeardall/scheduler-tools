@@ -3,7 +3,7 @@ import os
 import re
 import uuid
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Iterator, List, Mapping, Union
@@ -234,6 +234,8 @@ class JobSpec:
             cluster = Cluster.from_local()
         elif isinstance(cluster, str):
             cluster = Cluster(cluster)
+        if queue == "default":
+            queue = None
         return cls(
             id=str(uuid.uuid4()),
             experiment_path=experiment_path,
@@ -259,6 +261,9 @@ class JobSpec:
             "modified_time": self.modified_time.isoformat(),
             "comment": self.comment,
         }
+
+    def assign(self, **kwargs) -> "JobSpec":
+        return JobSpec(**{**asdict(self), **kwargs})
 
 
 @dataclass

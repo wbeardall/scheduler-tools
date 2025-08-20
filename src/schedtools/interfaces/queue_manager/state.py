@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 from urllib.parse import urlparse
 
 import paramiko
@@ -202,12 +202,23 @@ class ManagerState:
     def set_filter(self, filter: JobFilter) -> None:
         self.filter = filter
 
-    def resubmit_filtered_jobs(self) -> None:
+    def resubmit_filtered_jobs(
+        self, queue: Optional[str] = None, project: Optional[str] = None
+    ) -> None:
         if self.filter is None or self.filter.is_empty:
             raise ValueError("No filter set.")
         jobs = self.job_data
         for job in jobs:
-            self.workload_manager.resubmit_job(job)
+            if queue is not None and queue != job.queue:
+                # need to update the project along with the queue (for PBS)
+                # NOTE: This will not work with other clusters.
+                if queue == "default":
+                    job = job.assign(queue=None, project=None)
+                else:
+                    job = job.assign(queue=queue, project=project)
+                self.workload_manager.submit_job(job)
+            else:
+                self.workload_manager.resubmit_job(job)
 
     def delete_filtered_jobs(self, expected_count: int) -> None:
         if self.filter is None or self.filter.is_empty:
@@ -234,10 +245,10 @@ class ManagerState:
     def get_job(self, job_id: str) -> Job:
         return self.job_data.get(job_id)
 
-    def resubmit_alerted_jobs(self) -> None:
+    def resubmit_alerted_jobs(self, queue: Optional[str] = None) -> None:
         alerted = self.job_data.filter_state(JobState.ALERT)
         for job in alerted:
-            self.workload_manager.resubmit_job(job)
+            self.workload_manager.resubmit_job(job, queue=queue)
 
     def count_by_state(self, state: JobState) -> int:
         return len(self.job_data.filter_state(state))

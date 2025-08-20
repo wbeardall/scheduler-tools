@@ -1,6 +1,6 @@
 from enum import Enum
 from functools import partial
-from typing import Any, Callable, Union
+from typing import Any, Callable, Optional, Union
 
 import paramiko
 from textual import work
@@ -356,8 +356,10 @@ class JobBrowserScreen(Screen):
         # on_worker_state_changed will now fire
 
     @work(thread=True, exclusive=True, name="resubmit-filtered-jobs")
-    def resubmit_filtered_jobs(self) -> None:
-        self.state.resubmit_filtered_jobs()
+    def resubmit_filtered_jobs(
+        self, queue: Optional[str] = None, project: Optional[str] = None
+    ) -> None:
+        self.state.resubmit_filtered_jobs(queue=queue, project=project)
 
     @work(thread=True, exclusive=True, name="delete-filtered-jobs")
     def delete_filtered_jobs(self, expected_count: int) -> None:
@@ -422,7 +424,7 @@ class JobBrowserScreen(Screen):
                     )
                 else:
                     self.app.push_screen(
-                        ConfirmationScreen(
+                        JobResubmitScreen(
                             callback=self.resubmit_filtered_jobs,
                             message=f"Resubmit {len(self.state.job_data)} jobs?",
                         )
@@ -674,6 +676,75 @@ class ConfirmationScreen(Screen):
         match event.button.id:
             case "confirmation-confirm-button":
                 self.submit_if_confirmed()
+            case "confirmation-cancel-button":
+                self.app.pop_screen()
+
+
+class JobResubmitScreen(ConfirmationScreen):
+    def compose(self) -> ComposeResult:
+        yield Header()
+        with Container(id="confirmation-screen", classes="screen-container"):
+            with Center():
+                with Container(id="confirmation-content", classes="centered-container"):
+                    yield Label(
+                        self.message, id="confirmation-message", classes="screen-title"
+                    )
+                    yield Input(
+                        placeholder=f"Type '{self.required_phrase}' to proceed",
+                        id="confirmation-input",
+                    )
+                    with Horizontal(
+                        id="confirmation-buttons", classes="button-container"
+                    ):
+                        yield Button(
+                            "✅ Confirm",
+                            variant="primary",
+                            id="confirmation-confirm-button",
+                            classes="right-button",
+                        )
+                        yield Button(
+                            "⚡️ Submit exp-00077",
+                            variant="warning",
+                            id="confirmation-express-button",
+                            classes="action-button",
+                        )
+                        yield Button(
+                            "🐢 Submit Default",
+                            variant="warning",
+                            id="confirmation-standard-button",
+                            classes="action-button",
+                        )
+                        yield Button(
+                            "❌ Cancel",
+                            variant="primary",
+                            id="confirmation-cancel-button",
+                            classes="left-button",
+                        )
+        yield Footer()
+
+    def submit_if_confirmed(
+        self, queue: Optional[str] = None, project: Optional[str] = None
+    ) -> None:
+        input_field = self.query_one("#confirmation-input", Input)
+        if input_field.value == self.required_phrase:
+            self.callback(queue=queue, project=project)
+            self.app.pop_screen()
+        else:
+            self.notify(f"Please type '{self.required_phrase}' to proceed.")
+            input_field.value = ""
+            input_field.focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        self.submit_if_confirmed()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        match event.button.id:
+            case "confirmation-confirm-button":
+                self.submit_if_confirmed()
+            case "confirmation-express-button":
+                self.submit_if_confirmed(queue="express", project="exp-00077")
+            case "confirmation-standard-button":
+                self.submit_if_confirmed(queue="default")
             case "confirmation-cancel-button":
                 self.app.pop_screen()
 
