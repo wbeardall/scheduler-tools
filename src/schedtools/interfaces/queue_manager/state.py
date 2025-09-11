@@ -83,7 +83,7 @@ class JobFilter:
         clauses = []
         if self.state is not None:
             clauses.append(f"state = {self.state.value}")
-        if self.name is not None:
+        if self.name is not None and len(self.name) > 0:
             clauses.append(f"name matches '{self.name}'")
         return ", ".join(clauses)
 
